@@ -108,7 +108,8 @@ func (s *ApplicationContext) asyncRegEndpoint() {
 		if err == nil {
 			continue
 		}
-		glog.Errorf("ApplicationContext/asyncRegEndpoint 心跳保持异常,err:%+v", err)
+
+		glog.Errorf("ApplicationContext/asyncRegEndpoint 心跳保持异常,err:%+v", util.ConvertGrpcError(err))
 		// 请求调度器master服务出错则关闭连接然后重新创建连接
 		s.closeMasterConn()
 	}
@@ -126,6 +127,8 @@ func (s *ApplicationContext) closeMasterConn() {
 // 初始化调度器master连接
 func (s *ApplicationContext) initMasterConn() error {
 	s.closeMasterConn()
+	// 重置调度器master节点信息
+	s.masterNode = dto.NodeInfo{}
 	node := s.GetMasterNode()
 	var err error
 	s.masterConn, err = grpc.Dial(node.Url, grpc.WithInsecure())
@@ -167,7 +170,7 @@ func (s *ApplicationContext) requestMasterNode() error {
 	defer cancel()
 	resp, err := client.GetMaster(ctx, &emptypb.Empty{})
 	if err != nil {
-		return fmt.Errorf("请求调度器主节点信息异常,code:%+v", err)
+		return fmt.Errorf("请求调度器master节点信息异常,code:%+v", err)
 	}
 	s.lock.Lock()
 	defer s.lock.Unlock()

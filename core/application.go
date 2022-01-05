@@ -82,7 +82,11 @@ func (s *ApplicationContext) asyncRegEndpoint() {
 	var client node.NodeServiceClient
 	var err error
 	endpoint := fmt.Sprintf("%s:%d", s.conf.Endpoint, s.conf.Port)
-	nodeId := "node" + strings.ReplaceAll(endpoint, ".", "_")
+	prefix := s.conf.AppName
+	if prefix == "" {
+		prefix = "worker"
+	}
+	nodeId := prefix + strings.ReplaceAll(endpoint, ".", "_")
 	for _ = range timer {
 		if s.masterConn == nil {
 			err = s.initMasterConn()
@@ -101,18 +105,17 @@ func (s *ApplicationContext) asyncRegEndpoint() {
 			},
 		})
 		cancel()
-		if err != nil {
-			glog.Errorf("ApplicationContext/asyncRegEndpoint 心跳请求异常,err:%+v", err)
+		if err == nil {
+			continue
 		}
-
+		glog.Errorf("ApplicationContext/asyncRegEndpoint 心跳保持异常,err:%+v", err)
 		// 请求调度器master服务出错则关闭连接然后重新创建连接
 		s.closeMasterConn()
-
 	}
 
 }
 
-func (s ApplicationContext) closeMasterConn() {
+func (s *ApplicationContext) closeMasterConn() {
 	if s.masterConn == nil {
 		return
 	}
@@ -168,8 +171,9 @@ func (s *ApplicationContext) requestMasterNode() error {
 	}
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.masterNode.NodeId = resp.NodeId
-	s.masterNode.Url = resp.Url
+	s.masterNode.NodeId = resp.NodeInfo.NodeId
+	s.masterNode.Url = resp.NodeInfo.Url
+	return nil
 }
 
 func (s *ApplicationContext) initGrpc() {

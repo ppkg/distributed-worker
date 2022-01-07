@@ -28,6 +28,8 @@ type ApplicationContext struct {
 	masterNode dto.NodeInfo
 	masterConn *grpc.ClientConn
 	lock       sync.Mutex
+	// 支持的插件集合
+	pluginSet map[string]Plugin
 }
 
 func NewApp(opts ...Option) *ApplicationContext {
@@ -38,6 +40,11 @@ func NewApp(opts ...Option) *ApplicationContext {
 	}
 	instance.initGrpc()
 	return instance
+}
+
+// 注册插件
+func (s *ApplicationContext) RegisterPlugin(plugin Plugin) {
+	s.pluginSet[plugin.Name()] = plugin
 }
 
 // 初始化默认配置
@@ -65,8 +72,8 @@ func (s *ApplicationContext) Run() error {
 		return errors.New("调度服务url未配置")
 	}
 
-	// 异步向调度器注册endpoint
-	go s.asyncRegEndpoint()
+	// 定时发送心跳并向调度器注册endpoint
+	go s.cronHeartbeat()
 
 	// 初始化grpc服务
 	err := s.doServe()
@@ -77,8 +84,8 @@ func (s *ApplicationContext) Run() error {
 	return nil
 }
 
-// 通过心跳机制异步向调度器注册endpoint
-func (s *ApplicationContext) asyncRegEndpoint() {
+// 定时发送心跳
+func (s *ApplicationContext) cronHeartbeat() {
 	timer := time.Tick(1200 * time.Millisecond)
 	var client node.NodeServiceClient
 	var err error
@@ -88,11 +95,15 @@ func (s *ApplicationContext) asyncRegEndpoint() {
 		prefix = "worker"
 	}
 	nodeId := prefix + strings.ReplaceAll(endpoint, ".", "_")
+	plugins := make([]string, 0, len(s.pluginSet))
+	for k := range s.pluginSet {
+		plugins = append(plugins, k)
+	}
 	for _ = range timer {
 		if s.masterConn == nil {
 			err = s.initMasterConn()
 			if err != nil {
-				glog.Errorf("ApplicationContext/asyncRegEndpoint %v", err)
+				glog.Errorf("ApplicationContext/cronHeartbeat %v", err)
 				continue
 			}
 		}
@@ -101,16 +112,17 @@ func (s *ApplicationContext) asyncRegEndpoint() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 		_, err = client.HeartBeat(ctx, &node.HeartBeatRequest{
 			NodeInfo: &node.NodeInfo{
-				NodeId: nodeId,
-				Url:    endpoint,
+				NodeId:   nodeId,
+				Endpoint: endpoint,
 			},
+			PluginSet: plugins,
 		})
 		cancel()
 		if err == nil {
 			continue
 		}
 
-		glog.Errorf("ApplicationContext/asyncRegEndpoint 心跳保持异常,err:%+v", util.ConvertGrpcError(err))
+		glog.Errorf("ApplicationContext/cronHeartbeat 心跳保持异常,err:%+v", util.ConvertGrpcError(err))
 		// 请求调度器master服务出错则关闭连接然后重新创建连接
 		s.closeMasterConn()
 	}
@@ -132,7 +144,7 @@ func (s *ApplicationContext) initMasterConn() error {
 	s.masterNode = dto.NodeInfo{}
 	node := s.GetMasterNode()
 	var err error
-	s.masterConn, err = grpc.Dial(node.Url, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	s.masterConn, err = grpc.Dial(node.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器master节点连接,code:%+v", err)
 	}
@@ -176,7 +188,7 @@ func (s *ApplicationContext) requestMasterNode() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.masterNode.NodeId = resp.NodeInfo.NodeId
-	s.masterNode.Url = resp.NodeInfo.Url
+	s.masterNode.Endpoint = resp.NodeInfo.Endpoint
 	return nil
 }
 

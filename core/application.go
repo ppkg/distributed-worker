@@ -16,6 +16,7 @@ import (
 
 	"github.com/ppkg/glog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -131,7 +132,7 @@ func (s *ApplicationContext) initMasterConn() error {
 	s.masterNode = dto.NodeInfo{}
 	node := s.GetMasterNode()
 	var err error
-	s.masterConn, err = grpc.Dial(node.Url, grpc.WithInsecure())
+	s.masterConn, err = grpc.Dial(node.Url, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器master节点连接,code:%+v", err)
 	}
@@ -160,7 +161,7 @@ func (s *ApplicationContext) GetMasterNode() dto.NodeInfo {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestMasterNode() error {
-	conn, err := grpc.Dial(s.conf.SchedulerUrl, grpc.WithInsecure())
+	conn, err := grpc.Dial(s.conf.SchedulerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)
 	}

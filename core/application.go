@@ -33,7 +33,9 @@ type ApplicationContext struct {
 }
 
 func NewApp(opts ...Option) *ApplicationContext {
-	instance := &ApplicationContext{}
+	instance := &ApplicationContext{
+		pluginSet: make(map[string]Plugin),
+	}
 	instance.initDefaultConfig()
 	for _, m := range opts {
 		m(&instance.conf)
@@ -43,8 +45,9 @@ func NewApp(opts ...Option) *ApplicationContext {
 }
 
 // 注册插件
-func (s *ApplicationContext) RegisterPlugin(plugin Plugin) {
+func (s *ApplicationContext) RegisterPlugin(plugin Plugin) *ApplicationContext {
 	s.pluginSet[plugin.Name()] = plugin
+	return s
 }
 
 // 初始化默认配置

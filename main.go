@@ -14,6 +14,7 @@ func main() {
 	flag.Parse()
 
 	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithPortOption(*port), core.WithSchedulerUrlOption("127.0.0.1:5001"))
+	app.RegisterPlugin(core.NewPlus())
 
 	err := app.Run()
 	if err != nil {

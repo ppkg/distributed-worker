@@ -89,7 +89,8 @@ func (s *ApplicationContext) Run() error {
 
 // 定时发送心跳
 func (s *ApplicationContext) cronHeartbeat() {
-	timer := time.Tick(1200 * time.Millisecond)
+	duration := 1200 * time.Millisecond
+	timer := time.NewTimer(duration)
 	var client node.NodeServiceClient
 	var err error
 	endpoint := fmt.Sprintf("%s:%d", s.conf.Endpoint, s.conf.Port)
@@ -102,56 +103,57 @@ func (s *ApplicationContext) cronHeartbeat() {
 	for k := range s.pluginSet {
 		plugins = append(plugins, k)
 	}
-	for _ = range timer {
-		if s.masterConn == nil {
-			err = s.initMasterConn()
-			if err != nil {
-				glog.Errorf("ApplicationContext/cronHeartbeat %v", err)
-				continue
+
+	for {
+		func() {
+			<-timer.C
+			defer timer.Reset(duration)
+
+			if s.masterConn == nil {
+				_ = s.GetMasterNode()
 			}
-		}
 
-		client = node.NewNodeServiceClient(s.masterConn)
-		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
-		_, err = client.HeartBeat(ctx, &node.HeartBeatRequest{
-			NodeInfo: &node.NodeInfo{
-				NodeId:   nodeId,
-				Endpoint: endpoint,
-			},
-			PluginSet: plugins,
-		})
-		cancel()
-		if err == nil {
-			continue
-		}
+			client = node.NewNodeServiceClient(s.masterConn)
+			ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+			_, err = client.HeartBeat(ctx, &node.HeartBeatRequest{
+				NodeInfo: &node.NodeInfo{
+					NodeId:   nodeId,
+					Endpoint: endpoint,
+				},
+				PluginSet: plugins,
+			})
+			cancel()
+			if err == nil {
+				return
+			}
 
-		glog.Errorf("ApplicationContext/cronHeartbeat 心跳保持异常,err:%+v", util.ConvertGrpcError(err))
-		// 请求调度器master服务出错则关闭连接然后重新创建连接
-		s.closeMasterConn()
+			glog.Errorf("ApplicationContext/cronHeartbeat 心跳保持异常,err:%+v", util.ConvertGrpcError(err))
+
+			// 请求调度器master服务出错则关闭连接然后重新创建连接
+			s.resetMasterConn()
+			_ = s.GetMasterNode()
+		}()
 	}
 
 }
 
-func (s *ApplicationContext) closeMasterConn() {
-	if s.masterConn == nil {
-		return
+// 重置调度器master节点连接
+func (s *ApplicationContext) resetMasterConn() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.masterConn != nil {
+		s.masterConn.Close()
+		s.masterConn = nil
 	}
-	s.masterConn.Close()
-	s.masterConn = nil
-}
-
-// 初始化调度器master连接
-func (s *ApplicationContext) initMasterConn() error {
-	s.closeMasterConn()
-	// 重置调度器master节点信息
 	s.masterNode = dto.NodeInfo{}
-	node := s.GetMasterNode()
-	var err error
-	s.masterConn, err = grpc.Dial(node.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
-	if err != nil {
-		return fmt.Errorf("无法打开调度器master节点连接,code:%+v", err)
+}
+
+// 获取调度器master节点连接
+func (s *ApplicationContext) GetMasterConn() *grpc.ClientConn {
+	if s.masterConn == nil {
+		_ = s.GetMasterNode()
 	}
-	return nil
+	return s.masterConn
 }
 
 // 获取主节点信息
@@ -176,6 +178,11 @@ func (s *ApplicationContext) GetMasterNode() dto.NodeInfo {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestMasterNode() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.masterNode.NodeId != "" {
+		return nil
+	}
 	conn, err := grpc.Dial(s.conf.SchedulerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)
@@ -188,10 +195,13 @@ func (s *ApplicationContext) requestMasterNode() error {
 	if err != nil {
 		return fmt.Errorf("请求调度器master节点信息异常,code:%+v", err)
 	}
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.masterNode.NodeId = resp.NodeInfo.NodeId
 	s.masterNode.Endpoint = resp.NodeInfo.Endpoint
+
+	s.masterConn, err = grpc.Dial(s.masterNode.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	if err != nil {
+		return fmt.Errorf("无法打开调度器master节点连接,code:%+v", err)
+	}
 	return nil
 }
 

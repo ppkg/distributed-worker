@@ -108,13 +108,14 @@ func (s *ApplicationContext) cronHeartbeat() {
 	for k := range s.pluginSet {
 		plugins = append(plugins, k)
 	}
-
+	isFirst := true
 	for {
 		func() {
-			defer func() {
+			if !isFirst {
 				<-timer.C
-				timer.Reset(duration)
-			}()
+				isFirst = false
+			}
+			defer timer.Reset(duration)
 
 			if s.masterConn == nil {
 				_ = s.GetMasterNode()

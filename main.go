@@ -28,7 +28,7 @@ func main() {
 	})
 
 	if *isSubmitJob {
-		submit(app)
+		go submit(app)
 	}
 
 	err := app.Run()

@@ -4,11 +4,14 @@ import (
 	"context"
 	"distributed-worker/core"
 	"distributed-worker/proto/job"
+	"distributed-worker/proto/task"
+	"distributed-worker/service"
 	"flag"
 	"fmt"
 	"time"
 
 	"github.com/ppkg/kit"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -20,7 +23,9 @@ func main() {
 	flag.Parse()
 
 	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithPortOption(*port), core.WithSchedulerUrlOption("127.0.0.1:5001"))
-	app.RegisterPlugin(core.NewPlus())
+	app.RegisterPlugin(core.NewPlus()).RegisterGrpc(func(appCtx *core.ApplicationContext, server *grpc.Server) {
+		task.RegisterTaskServiceServer(server, service.NewTaskService(appCtx))
+	})
 
 	if *isSubmitJob {
 		submit(app)

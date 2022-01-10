@@ -50,6 +50,11 @@ func (s *ApplicationContext) RegisterPlugin(plugin Plugin) *ApplicationContext {
 	return s
 }
 
+// 获取插件
+func (s *ApplicationContext) GetPlugin(name string) Plugin {
+	return s.pluginSet[name]
+}
+
 // 初始化默认配置
 func (s *ApplicationContext) initDefaultConfig() {
 	s.conf.AppName = os.Getenv("APP_NAME")
@@ -106,8 +111,10 @@ func (s *ApplicationContext) cronHeartbeat() {
 
 	for {
 		func() {
-			<-timer.C
-			defer timer.Reset(duration)
+			defer func() {
+				<-timer.C
+				timer.Reset(duration)
+			}()
 
 			if s.masterConn == nil {
 				_ = s.GetMasterNode()
@@ -210,8 +217,8 @@ func (s *ApplicationContext) initGrpc() {
 }
 
 // 注册grpc服务
-func (s *ApplicationContext) RegisterGrpc(f func(server *grpc.Server)) *ApplicationContext {
-	f(s.grpcServer)
+func (s *ApplicationContext) RegisterGrpc(f func(appCtx *ApplicationContext, server *grpc.Server)) *ApplicationContext {
+	f(s, s.grpcServer)
 	return s
 }
 

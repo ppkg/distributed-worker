@@ -178,7 +178,6 @@ func (s *ApplicationContext) GetMasterNode() dto.NodeInfo {
 		}
 		glog.Errorf("ApplicationContext/GetMasterNode %v", err.Error())
 		time.Sleep(3 * time.Second)
-		glog.Errorf("ApplicationContext/GetMasterNode 每隔3秒执行第%d次重试", retryCount)
 		retryCount++
 	}
 	return s.masterNode

@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithPortOption(*port), core.WithSchedulerUrlOption("127.0.0.1:5001"))
-	app.RegisterPlugin(core.NewPlus()).RegisterGrpc(func(appCtx *core.ApplicationContext, server *grpc.Server) {
+	app.RegisterPlugin(core.NewPlus()).RegisterPlugin(core.NewMulti()).RegisterGrpc(func(appCtx *core.ApplicationContext, server *grpc.Server) {
 		task.RegisterTaskServiceServer(server, service.NewTaskService(appCtx))
 	})
 
@@ -114,6 +114,7 @@ func submit(ctx *core.ApplicationContext) {
 			Type: "plusJob",
 			PluginSet: []string{
 				"plus",
+				"multi",
 			},
 			Data: kit.JsonEncode(item),
 		})

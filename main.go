@@ -109,7 +109,7 @@ func submit(ctx *core.ApplicationContext) {
 		},
 	}
 	for _, item := range data {
-		req.Send(&job.SubmitRequest{
+		req.Send(&job.SyncSubmitRequest{
 			Name: "plus-test",
 			Type: "plusJob",
 			PluginSet: []string{

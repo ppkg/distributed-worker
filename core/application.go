@@ -198,7 +198,7 @@ func (s *ApplicationContext) requestMasterNode() error {
 	defer cancel()
 	resp, err := client.GetMaster(ctx, &emptypb.Empty{})
 	if err != nil {
-		return fmt.Errorf("获取master调度器节点信息异常,code:%+v", err)
+		return fmt.Errorf("获取调度器master节点信息异常,code:%+v", err)
 	}
 	s.masterNode.NodeId = resp.NodeInfo.NodeId
 	s.masterNode.Endpoint = resp.NodeInfo.Endpoint

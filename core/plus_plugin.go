@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ppkg/kit"
@@ -16,7 +17,8 @@ func (s *plusPlugin) Name() string {
 func (s *plusPlugin) Execute(Id int64, jobId int64, input string) (string, error) {
 	var params plusParam
 	kit.JsonDecode([]byte(input), &params)
-	time.Sleep(3 * time.Second)
+	time.Sleep(10 * time.Second)
+	fmt.Printf("%s->完成任务(%d,%d)\n", s.Name(), Id, jobId)
 	return kit.JsonEncode(map[string]interface{}{
 		"result": params.A + params.B,
 	}), nil

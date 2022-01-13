@@ -30,24 +30,7 @@ func main() {
 		task.RegisterTaskServiceServer(server, service.NewTaskService(appCtx))
 	})
 
-	if *isSubmitJob {
-		go syncSubmit(app)
-	}
-
-	if *isAsyncJob {
-		go asyncSubmit(app)
-	}
-
-	go subscribeAsyncCallback(app)
-
-	err := app.Run()
-	if err != nil {
-		fmt.Println("got err:", err)
-	}
-}
-
-func subscribeAsyncCallback(ctx *core.ApplicationContext) {
-	ctx.SubscribeAsyncNotify(func(appCtx *core.ApplicationContext, data dto.JobNotify) {
+	app.SubscribeAsyncNotify(func(appCtx *core.ApplicationContext, data dto.JobNotify) {
 		var list []resultRsp
 		json.Unmarshal([]byte(data.Result), &list)
 		var result int
@@ -56,6 +39,19 @@ func subscribeAsyncCallback(ctx *core.ApplicationContext) {
 		}
 		fmt.Printf("回调通知，job信息:%d|%s，最终计算结果：%d\n", data.Id, data.Name, result)
 	})
+
+	if *isSubmitJob {
+		go syncSubmit(app)
+	}
+
+	if *isAsyncJob {
+		go asyncSubmit(app)
+	}
+
+	err := app.Run()
+	if err != nil {
+		fmt.Println("got err:", err)
+	}
 }
 
 func syncSubmit(ctx *core.ApplicationContext) {

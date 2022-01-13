@@ -92,18 +92,25 @@ func (s *ApplicationContext) Run() error {
 	return nil
 }
 
+func (s *ApplicationContext) getEndpoint() string {
+	return fmt.Sprintf("%s:%d", s.conf.Endpoint, s.conf.Port)
+}
+
+func (s *ApplicationContext) GetNodeId() string {
+	prefix := s.conf.AppName
+	if prefix == "" {
+		prefix = "worker"
+	}
+	return prefix + strings.ReplaceAll(s.getEndpoint(), ".", "_")
+}
+
 // 定时发送心跳
 func (s *ApplicationContext) cronHeartbeat() {
 	duration := 1200 * time.Millisecond
 	timer := time.NewTimer(duration)
 	var client node.NodeServiceClient
 	var err error
-	endpoint := fmt.Sprintf("%s:%d", s.conf.Endpoint, s.conf.Port)
-	prefix := s.conf.AppName
-	if prefix == "" {
-		prefix = "worker"
-	}
-	nodeId := prefix + strings.ReplaceAll(endpoint, ".", "_")
+
 	plugins := make([]string, 0, len(s.pluginSet))
 	for k := range s.pluginSet {
 		plugins = append(plugins, k)
@@ -123,8 +130,8 @@ func (s *ApplicationContext) cronHeartbeat() {
 			ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 			_, err = client.HeartBeat(ctx, &node.HeartBeatRequest{
 				NodeInfo: &node.NodeInfo{
-					NodeId:   nodeId,
-					Endpoint: endpoint,
+					NodeId:   s.GetNodeId(),
+					Endpoint: s.getEndpoint(),
 				},
 				PluginSet: plugins,
 			})

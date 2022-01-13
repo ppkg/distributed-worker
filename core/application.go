@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"distributed-worker/dto"
+	"distributed-worker/proto/job"
 	"distributed-worker/proto/node"
 	"distributed-worker/util"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ppkg/glog"
+	"github.com/ppkg/kit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -29,7 +31,8 @@ type ApplicationContext struct {
 	masterConn *grpc.ClientConn
 	lock       sync.Mutex
 	// 支持的插件集合
-	pluginSet map[string]Plugin
+	pluginSet     map[string]Plugin
+	jobNotifyFunc func(appCtx *ApplicationContext, data dto.JobNotify)
 }
 
 func NewApp(opts ...Option) *ApplicationContext {
@@ -82,6 +85,10 @@ func (s *ApplicationContext) Run() error {
 
 	// 定时发送心跳并向调度器注册endpoint
 	go s.cronHeartbeat()
+	// 订阅job异步通知
+	if s.jobNotifyFunc != nil {
+		go s.doAsyncNotify()
+	}
 
 	// 初始化grpc服务
 	err := s.doServe()
@@ -237,6 +244,50 @@ func (s *ApplicationContext) doServe() error {
 		return fmt.Errorf("failed to grpc serve: %v", err)
 	}
 	return nil
+}
+
+// 订阅异步通知
+func (s *ApplicationContext) SubscribeAsyncNotify(callback func(appCtx *ApplicationContext, data dto.JobNotify)) *ApplicationContext {
+	s.jobNotifyFunc = callback
+	return s
+}
+
+func (s *ApplicationContext) doAsyncNotify() error {
+	myDuration := 30 * time.Second
+	timer := time.NewTimer(myDuration)
+	for {
+		func() {
+			defer func() {
+				<-timer.C
+				timer.Reset(myDuration)
+			}()
+
+			client := job.NewJobServiceClient(s.GetMasterConn())
+			resp, err := client.AsyncNotify(context.Background(), &job.AsyncNotifyRequest{
+				NodeId: s.GetNodeId(),
+			})
+			if err != nil {
+				glog.Errorf("订阅异步job通知异常,scheduler:%s,err:%+v", kit.JsonEncode(s.GetMasterNode()), err)
+				return
+			}
+			glog.Infof("订阅异步job通知成功,scheduler:%s", kit.JsonEncode(s.GetMasterNode()))
+			for {
+				data, err := resp.Recv()
+				if err != nil {
+					glog.Errorf("接收job异步通知异常,scheduler:%s,err:%+v", kit.JsonEncode(s.GetMasterNode()), err)
+					return
+				}
+				s.jobNotifyFunc(s, dto.JobNotify{
+					Id:     data.Id,
+					Name:   data.Name,
+					Type:   data.Type,
+					Status: data.Status,
+					Result: data.Result,
+				})
+			}
+		}()
+	}
+
 }
 
 // 应用配置

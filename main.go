@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"distributed-worker/core"
+	"distributed-worker/dto"
 	"distributed-worker/proto/job"
 	"distributed-worker/proto/task"
 	"distributed-worker/service"
@@ -46,21 +47,7 @@ func main() {
 }
 
 func subscribeAsyncCallback(ctx *core.ApplicationContext) {
-	fmt.Println("正在订阅主节点回调通知...")
-	client := job.NewJobServiceClient(ctx.GetMasterConn())
-	resp, err := client.AsyncNotify(context.Background(), &job.AsyncNotifyRequest{
-		NodeId: ctx.GetNodeId(),
-	})
-	if err != nil {
-		fmt.Println("订阅回调通知失败", err)
-		return
-	}
-	for {
-		data, err := resp.Recv()
-		if err != nil {
-			fmt.Println("接受流数据异常退出", err)
-			return
-		}
+	ctx.SubscribeAsyncNotify(func(appCtx *core.ApplicationContext, data dto.JobNotify) {
 		var list []resultRsp
 		json.Unmarshal([]byte(data.Result), &list)
 		var result int
@@ -68,8 +55,7 @@ func subscribeAsyncCallback(ctx *core.ApplicationContext) {
 			result += item.Result
 		}
 		fmt.Printf("回调通知，job信息:%d|%s，最终计算结果：%d\n", data.Id, data.Name, result)
-	}
-
+	})
 }
 
 func syncSubmit(ctx *core.ApplicationContext) {

@@ -25,7 +25,7 @@ var (
 func main() {
 	flag.Parse()
 
-	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithPortOption(*port), core.WithSchedulerUrlOption("127.0.0.1:5001"))
+	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithNacosSchedulerServiceNameOption("distributed-scheduler"), core.WithNacosAddrOption("mse-e52dbdd6-p.nacos-ans.mse.aliyuncs.com:8848"), core.WithNacosNamespaceOption("27fdefc2-ae39-41fd-bac4-9256acbf97bc"), core.WithNacosGroupNameOption("test"), core.WithPortOption(*port))
 	app.RegisterPlugin(core.NewPlus()).RegisterPlugin(core.NewMulti()).RegisterGrpc(func(appCtx *core.ApplicationContext, server *grpc.Server) {
 		task.RegisterTaskServiceServer(server, service.NewTaskService(appCtx))
 	})

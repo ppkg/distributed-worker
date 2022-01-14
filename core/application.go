@@ -15,6 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nacos-group/nacos-sdk-go/clients"
+	namingClient "github.com/nacos-group/nacos-sdk-go/clients/naming_client"
+	"github.com/nacos-group/nacos-sdk-go/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/vo"
 	"github.com/ppkg/glog"
 	"github.com/ppkg/kit"
 	"google.golang.org/grpc"
@@ -33,6 +37,8 @@ type ApplicationContext struct {
 	// 支持的插件集合
 	pluginSet     map[string]Plugin
 	jobNotifyFunc func(appCtx *ApplicationContext, data dto.JobNotify)
+
+	namingClient namingClient.INamingClient
 }
 
 func NewApp(opts ...Option) *ApplicationContext {
@@ -76,11 +82,56 @@ func (s *ApplicationContext) initDefaultConfig() {
 	s.conf.SchedulerUrl = os.Getenv("SCHEDULER_URL")
 }
 
+// 服务发现，向nacos注册服务
+func (s *ApplicationContext) initNacos() error {
+	// 如果nacos未配置则不需要初始化
+	if len(s.conf.Nacos.Addrs) == 0 {
+		return nil
+	}
+
+	var err error
+	clientConfig := constant.ClientConfig{
+		NamespaceId:         s.conf.Nacos.Namespace,
+		TimeoutMs:           2000,
+		NotLoadCacheAtStart: true,
+		LogDir:              "/tmp/nacos/log",
+		CacheDir:            "/tmp/nacos/cache",
+		RotateTime:          "24h",
+		MaxAge:              3,
+		LogLevel:            "info",
+	}
+
+	serverConfigs := make([]constant.ServerConfig, 0, len(s.conf.Nacos.Addrs))
+	for i, host := range s.conf.Nacos.Addrs {
+		serverConfigs = append(serverConfigs, constant.ServerConfig{
+			IpAddr: host,
+			Port:   uint64(s.conf.Nacos.Ports[i]),
+		})
+	}
+
+	s.namingClient, err = clients.CreateNamingClient(map[string]interface{}{
+		"serverConfigs": serverConfigs,
+		"clientConfig":  clientConfig,
+	})
+	if err != nil {
+		return fmt.Errorf("当前应用:%s，实例化nacos客户端异常:%v", s.conf.AppName, err)
+	}
+
+	return nil
+}
+
 func (s *ApplicationContext) Run() error {
 	// 检查调度服务url是否配置
-	if s.conf.SchedulerUrl == "" {
-		glog.Errorf("Application/run 调度服务url未配置")
-		return errors.New("调度服务url未配置")
+	if s.conf.SchedulerUrl == "" && len(s.conf.Nacos.Addrs) == 0 {
+		err := errors.New("调度服务地址(SchedulerUrl)或Nacos地址未配置")
+		glog.Errorf("Application/run %v", err)
+		return err
+	}
+
+	err := s.initNacos()
+	if err != nil {
+		glog.Errorf("Application/run 初始化nacos客户端异常,%v", err)
+		return err
 	}
 
 	// 定时发送心跳并向调度器注册endpoint
@@ -91,12 +142,38 @@ func (s *ApplicationContext) Run() error {
 	}
 
 	// 初始化grpc服务
-	err := s.doServe()
+	err = s.doServe()
 	if err != nil {
 		glog.Errorf("Application/run 监听grpc服务异常,err:%v", err)
 		return err
 	}
 	return nil
+}
+
+// 获取调度器地址
+func (s *ApplicationContext) getSchedulerUrl() string {
+	scheduleUrl := func() string {
+		if s.namingClient == nil {
+			return s.conf.SchedulerUrl
+		}
+
+		instance, err := s.namingClient.SelectOneHealthyInstance(vo.SelectOneHealthInstanceParam{
+			ServiceName: s.conf.Nacos.SchedulerServiceName,
+			Clusters: []string{
+				s.conf.Nacos.ClusterName,
+			},
+			GroupName: s.conf.Nacos.GroupName,
+		})
+		if err != nil {
+			glog.Errorf("ApplicationContext/getSchedulerUrl 从nacos获取调度器地址异常,err:%+v", err)
+			return s.conf.SchedulerUrl
+		}
+		return fmt.Sprintf("%s:%d", instance.Ip, instance.Port)
+	}()
+	if scheduleUrl == "" {
+		scheduleUrl = "127.0.0.1:8080"
+	}
+	return scheduleUrl
 }
 
 func (s *ApplicationContext) getEndpoint() string {
@@ -182,6 +259,13 @@ func (s *ApplicationContext) GetMasterNode() dto.NodeInfo {
 		return s.masterNode
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.masterNode.NodeId != "" {
+		return s.masterNode
+	}
+
 	retryCount := 1
 	for {
 		err := s.requestMasterNode()
@@ -197,12 +281,10 @@ func (s *ApplicationContext) GetMasterNode() dto.NodeInfo {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestMasterNode() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	if s.masterNode.NodeId != "" {
 		return nil
 	}
-	conn, err := grpc.Dial(s.conf.SchedulerUrl, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)
 	}
@@ -300,6 +382,18 @@ type Config struct {
 	Port int
 	// 调度器地址(域名/ip+端口号)
 	SchedulerUrl string
+	// nacos配置
+	Nacos NacosConfig
+}
+
+type NacosConfig struct {
+	// 调度器服务名称
+	SchedulerServiceName string
+	Addrs                []string
+	Ports                []int
+	Namespace            string
+	GroupName            string
+	ClusterName          string
 }
 
 type Option func(conf *Config)
@@ -327,4 +421,53 @@ func WithSchedulerUrlOption(schedulerUrl string) Option {
 	return func(conf *Config) {
 		conf.SchedulerUrl = schedulerUrl
 	}
+}
+
+// 配置nacos服务地址，格式：域名(ip)+端口号
+func WithNacosAddrOption(addr string) Option {
+	return func(conf *Config) {
+		if addr == "" {
+			return
+		}
+		host, port := parseNacosAddr(addr)
+		conf.Nacos.Addrs = append(conf.Nacos.Addrs, host)
+		conf.Nacos.Ports = append(conf.Nacos.Ports, port)
+	}
+}
+
+func WithNacosSchedulerServiceNameOption(serviceName string) Option {
+	return func(conf *Config) {
+		conf.Nacos.SchedulerServiceName = serviceName
+	}
+}
+
+func WithNacosGroupNameOption(group string) Option {
+	return func(conf *Config) {
+		conf.Nacos.GroupName = group
+	}
+}
+
+func WithNacosClusterNameOption(cluster string) Option {
+	return func(conf *Config) {
+		conf.Nacos.ClusterName = cluster
+	}
+}
+
+func WithNacosNamespaceOption(namespace string) Option {
+	return func(conf *Config) {
+		conf.Nacos.Namespace = namespace
+	}
+}
+
+// 解析nacos地址
+func parseNacosAddr(addr string) (string, int) {
+	pathInfo := strings.Split(addr, ":")
+	port := 8848
+	if len(pathInfo) > 1 {
+		tmp, _ := strconv.Atoi(pathInfo[1])
+		if tmp > 0 {
+			port = tmp
+		}
+	}
+	return pathInfo[0], port
 }

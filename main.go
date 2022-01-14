@@ -58,7 +58,7 @@ func syncSubmit(ctx *core.ApplicationContext) {
 	time.Sleep(10 * time.Second)
 	startTime := time.Now()
 	fmt.Println("开始创建同步任务...", "创建时间", startTime.Format("2006-01-02 15:04:05"))
-	client := job.NewJobServiceClient(ctx.GetMasterConn())
+	client := job.NewJobServiceClient(ctx.GetLeaderConn())
 	req, err := client.SyncSubmit(context.Background())
 	if err != nil {
 		fmt.Println("请求SyncSubmit出错 ", err)
@@ -2480,7 +2480,7 @@ func syncSubmit(ctx *core.ApplicationContext) {
 
 	resp, err := req.CloseAndRecv()
 	if err != nil {
-		fmt.Println("获取结果异常-->", err)
+		fmt.Println("获取结果异常.......................-->", err)
 		return
 	}
 	endTime := time.Now()
@@ -2500,7 +2500,7 @@ func asyncSubmit(ctx *core.ApplicationContext) {
 	time.Sleep(10 * time.Second)
 	startTime := time.Now()
 	fmt.Println("开始创建异步任务...", "创建时间", startTime.Format("2006-01-02 15:04:05"))
-	client := job.NewJobServiceClient(ctx.GetMasterConn())
+	client := job.NewJobServiceClient(ctx.GetLeaderConn())
 	req, err := client.AsyncSubmit(context.Background())
 	if err != nil {
 		fmt.Println("请求AsyncSubmit出错 ", err)

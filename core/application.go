@@ -68,11 +68,18 @@ func (s *ApplicationContext) GetPlugin(name string) Plugin {
 	return s.pluginSet[name]
 }
 
+// 获取所有已注册插件名称
+func (s *ApplicationContext) GetPluginSet() []string {
+	list := make([]string, 0, len(s.pluginSet))
+	for name := range s.pluginSet {
+		list = append(list, name)
+	}
+	return list
+}
+
 // 初始化默认配置
 func (s *ApplicationContext) initDefaultConfig() {
 	s.conf.AppName = os.Getenv("APP_NAME")
-	s.conf.ServiceName = "distributed-workder"
-	s.conf.Nacos.WorkerStartupTimeKey = "workerStartupTime"
 	s.conf.Endpoint = os.Getenv("ENDPOINT")
 	if s.conf.Endpoint == "" {
 		s.conf.Endpoint = util.GetLocalIp()
@@ -86,6 +93,19 @@ func (s *ApplicationContext) initDefaultConfig() {
 	}
 
 	s.conf.SchedulerUrl = os.Getenv("SCHEDULER_URL")
+
+	s.conf.Nacos.WorkerServiceName = "distributed-workder"
+	s.conf.Nacos.WorkerStartupTimeKey = "workerStartupTime"
+	s.conf.Nacos.ClusterName = os.Getenv("NACOS_CLUSTER_NAME")
+	s.conf.Nacos.ServiceGroup = os.Getenv("NACOS_SERVICE_GROUP")
+	if s.conf.Nacos.ServiceGroup == "" {
+		s.conf.Nacos.ServiceGroup = "DEFAULT_GROUP"
+	}
+	s.conf.Nacos.Namespace = os.Getenv("NACOS_NAMESPACE")
+	s.conf.Nacos.ConfigGroup = os.Getenv("NACOS_CONFIG_GROUP")
+	if s.conf.Nacos.ConfigGroup == "" {
+		s.conf.Nacos.ConfigGroup = "DEFAULT_GROUP"
+	}
 }
 
 // 服务发现，向nacos注册服务
@@ -134,17 +154,18 @@ func (s *ApplicationContext) initNacos() error {
 	success, err := s.namingClient.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          s.conf.Endpoint,
 		Port:        uint64(s.conf.Port),
-		ServiceName: s.conf.ServiceName,
+		ServiceName: s.conf.Nacos.WorkerServiceName,
 		Weight:      10,
 		Enable:      true,
 		Healthy:     true,
 		Ephemeral:   true,
 		Metadata: map[string]string{
-			"appName": s.conf.AppName,
-			"nodeId":  s.GetNodeId(),
+			"appName":   s.conf.AppName,
+			"nodeId":    s.GetNodeId(),
+			"pluginSet": strings.Join(s.GetPluginSet(), ","),
 		},
-		ClusterName: s.conf.Nacos.ClusterName, // default value is DEFAULT
-		GroupName:   s.conf.Nacos.GroupName,   // default value is DEFAULT_GROUP
+		ClusterName: s.conf.Nacos.ClusterName,  // default value is DEFAULT
+		GroupName:   s.conf.Nacos.ServiceGroup, // default value is DEFAULT_GROUP
 	})
 	if err != nil {
 		return fmt.Errorf("当前节点:%s，注册服务发现异常:%v", s.GetNodeId(), err)
@@ -208,7 +229,7 @@ func (s *ApplicationContext) getSchedulerUrl() string {
 			Clusters: []string{
 				s.conf.Nacos.ClusterName,
 			},
-			GroupName: s.conf.Nacos.GroupName,
+			GroupName: s.conf.Nacos.ServiceGroup,
 		})
 		if err != nil {
 			glog.Errorf("ApplicationContext/getSchedulerUrl 从nacos获取调度器地址异常,err:%+v", err)
@@ -376,8 +397,6 @@ func (s *ApplicationContext) doAsyncNotify() error {
 type Config struct {
 	// 应用名称
 	AppName string
-	// 服务名称
-	ServiceName string
 	// 服务端点
 	Endpoint string
 	// 应用监听端口号
@@ -391,11 +410,13 @@ type Config struct {
 type NacosConfig struct {
 	// 调度器服务名称
 	SchedulerServiceName string
-	Addrs                []string
-	Ports                []int
-	Namespace            string
-	GroupName            string
-	ClusterName          string
+	// worker服务名称
+	WorkerServiceName string
+	Addrs             []string
+	Ports             []int
+	Namespace         string
+	ServiceGroup      string
+	ClusterName       string
 
 	// nacos配置服务的配置参数
 	// worker工作节点启动时间key
@@ -448,9 +469,9 @@ func WithNacosSchedulerServiceNameOption(serviceName string) Option {
 	}
 }
 
-func WithNacosGroupNameOption(group string) Option {
+func WithNacosServiceGroupOption(group string) Option {
 	return func(conf *Config) {
-		conf.Nacos.GroupName = group
+		conf.Nacos.ServiceGroup = group
 	}
 }
 

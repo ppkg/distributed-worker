@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"distributed-worker/core"
-	"distributed-worker/dto"
 	"distributed-worker/proto/job"
 	"distributed-worker/proto/task"
 	"distributed-worker/service"
@@ -28,16 +27,6 @@ func main() {
 	app := core.NewApp(core.WithAppNameOption("distributed-worker"), core.WithNacosSchedulerServiceNameOption("distributed-scheduler"), core.WithNacosAddrOption("10.11.12.78:8848"), core.WithNacosNamespaceOption("da30c79a-ad57-4ede-89dd-5eeb640d8655"), core.WithNacosServiceGroupOption("my-service"), core.WithPortOption(*port))
 	app.RegisterPlugin(core.NewPlus()).RegisterPlugin(core.NewMulti()).RegisterGrpc(func(appCtx *core.ApplicationContext, server *grpc.Server) {
 		task.RegisterTaskServiceServer(server, service.NewTaskService(appCtx))
-	})
-
-	app.SubscribeAsyncNotify(func(appCtx *core.ApplicationContext, data dto.JobNotify) {
-		var list []resultRsp
-		json.Unmarshal([]byte(data.Result), &list)
-		var result int
-		for _, item := range list {
-			result += item.Result
-		}
-		fmt.Printf("回调通知，job信息:%d|%s，最终计算结果：%d\n", data.Id, data.Name, result)
 	})
 
 	if *isSubmitJob {
@@ -2469,7 +2458,6 @@ func syncSubmit(ctx *core.ApplicationContext) {
 	for _, item := range data {
 		req.Send(&job.SyncSubmitRequest{
 			Name: "sync-job-test",
-			Type: "plusJob",
 			PluginSet: []string{
 				"plus",
 				"multi",

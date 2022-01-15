@@ -21,7 +21,6 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/vo"
 	"github.com/ppkg/glog"
-	"github.com/ppkg/kit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -38,8 +37,7 @@ type ApplicationContext struct {
 	// 支持的插件集合
 	pluginSet map[string]PluginHandler
 	// job回调通知handler集合
-	jobNotifySet  map[string]JobNotifyHandler
-	jobNotifyFunc func(appCtx *ApplicationContext, data dto.JobNotify)
+	jobNotifySet map[string]JobNotifyHandler
 
 	// nacos服务发现客户端
 	namingClient namingClient.INamingClient
@@ -172,10 +170,10 @@ func (s *ApplicationContext) initNacos() error {
 		Healthy:     true,
 		Ephemeral:   true,
 		Metadata: map[string]string{
-			"appName":   s.conf.AppName,
-			"nodeId":    s.GetNodeId(),
-			"pluginSet": strings.Join(s.GetPluginNameSet(), ","),
-			"jobNotifySet":strings.Join(s.GetJobNotifyNameSet(),","),
+			"appName":      s.conf.AppName,
+			"nodeId":       s.GetNodeId(),
+			"pluginSet":    strings.Join(s.GetPluginNameSet(), ","),
+			"jobNotifySet": strings.Join(s.GetJobNotifyNameSet(), ","),
 		},
 		ClusterName: s.conf.Nacos.ClusterName,  // default value is DEFAULT
 		GroupName:   s.conf.Nacos.ServiceGroup, // default value is DEFAULT_GROUP
@@ -202,6 +200,11 @@ func (s *ApplicationContext) Run() error {
 		glog.Errorf("Application/run 初始化nacos客户端异常,%v", err)
 		return err
 	}
+
+	// 注册内置grpc服务
+	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
+		job.RegisterJobServiceServer(server, NewJobService(s))
+	})
 
 	// 初始化grpc服务
 	err = s.doServe()
@@ -331,50 +334,6 @@ func (s *ApplicationContext) doServe() error {
 		return fmt.Errorf("failed to grpc serve: %v", err)
 	}
 	return nil
-}
-
-// 订阅异步通知
-func (s *ApplicationContext) SubscribeAsyncNotify(callback func(appCtx *ApplicationContext, data dto.JobNotify)) *ApplicationContext {
-	s.jobNotifyFunc = callback
-	return s
-}
-
-func (s *ApplicationContext) doAsyncNotify() error {
-	myDuration := 30 * time.Second
-	timer := time.NewTimer(myDuration)
-	for {
-		func() {
-			defer func() {
-				<-timer.C
-				timer.Reset(myDuration)
-			}()
-
-			client := job.NewJobServiceClient(s.GetLeaderConn())
-			resp, err := client.AsyncNotify(context.Background(), &job.AsyncNotifyRequest{
-				NodeId: s.GetNodeId(),
-			})
-			if err != nil {
-				glog.Errorf("订阅异步job通知异常,scheduler:%s,err:%+v", kit.JsonEncode(s.GetLeaderNode()), err)
-				return
-			}
-			glog.Infof("订阅异步job通知成功,scheduler:%s", kit.JsonEncode(s.GetLeaderNode()))
-			for {
-				data, err := resp.Recv()
-				if err != nil {
-					glog.Errorf("接收job异步通知异常,scheduler:%s,err:%+v", kit.JsonEncode(s.GetLeaderNode()), err)
-					return
-				}
-				s.jobNotifyFunc(s, dto.JobNotify{
-					Id:     data.Id,
-					Name:   data.Name,
-					Type:   data.Type,
-					Status: data.Status,
-					Result: data.Result,
-				})
-			}
-		}()
-	}
-
 }
 
 // 应用配置

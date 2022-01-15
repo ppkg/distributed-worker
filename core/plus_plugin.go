@@ -14,7 +14,7 @@ func (s *plusPlugin) Name() string {
 	return "plus"
 }
 
-func (s *plusPlugin) Handle(Id int64, jobId int64, input string) (string, error) {
+func (s *plusPlugin) Handle(ctx *ApplicationContext, Id int64, jobId int64, input string) (string, error) {
 	var params plusParam
 	_ = kit.JsonDecode([]byte(input), &params)
 	time.Sleep(10 * time.Second)

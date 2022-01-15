@@ -187,8 +187,8 @@ func (s *ApplicationContext) Run() error {
 
 	// 订阅job异步通知
 	if s.jobNotifyFunc != nil {
-		go func ()  {
-			_=s.doAsyncNotify()
+		go func() {
+			_ = s.doAsyncNotify()
 		}()
 	}
 
@@ -236,7 +236,7 @@ func (s *ApplicationContext) GetNodeId() string {
 	if prefix == "" {
 		prefix = "worker"
 	}
-	return prefix + strings.ReplaceAll(s.conf.Endpoint, ".", "_")
+	return prefix + strings.ReplaceAll(s.getEndpoint(), ".", "_")
 }
 
 // 获取调度器leader节点连接

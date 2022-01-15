@@ -14,7 +14,7 @@ func (s *multiPlugin) Name() string {
 	return "multi"
 }
 
-func (s *multiPlugin) Execute(Id int64, jobId int64, input string) (string, error) {
+func (s *multiPlugin) Handle(Id int64, jobId int64, input string) (string, error) {
 	var params multiParam
 	_=kit.JsonDecode([]byte(input), &params)
 	time.Sleep(5 * time.Second)
@@ -24,7 +24,7 @@ func (s *multiPlugin) Execute(Id int64, jobId int64, input string) (string, erro
 	}), nil
 }
 
-func NewMulti() Plugin {
+func NewMulti() PluginHandler {
 	return &multiPlugin{}
 }
 

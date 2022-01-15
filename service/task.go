@@ -18,8 +18,8 @@ type taskService struct {
 
 // 同步提交task
 func (s *taskService) SyncSubmit(ctx context.Context, req *task.SubmitRequest) (*task.SyncSubmitResponse, error) {
-	plugin := s.appCtx.GetPlugin(req.Plugin)
-	if plugin == nil {
+	handler := s.appCtx.GetPluginHandler(req.Plugin)
+	if handler == nil {
 		glog.Errorf("taskService/SyncSubmit 当前服务不支持插件%s,请求参数:%s", req.Plugin, kit.JsonEncode(req))
 		return nil, errCode.ToGrpcErr(errCode.ErrPluginUnsupport, req.Plugin)
 	}
@@ -28,7 +28,7 @@ func (s *taskService) SyncSubmit(ctx context.Context, req *task.SubmitRequest) (
 		JobId:  req.JobId,
 		Status: enum.FinishTaskStatus,
 	}
-	result, err := plugin.Execute(req.Id, req.JobId, req.Data)
+	result, err := handler.Handle(req.Id, req.JobId, req.Data)
 	if err != nil {
 		glog.Errorf("taskService/SyncSubmit 运行插件%s异常,请求参数:%s,err:%+v", req.Plugin, kit.JsonEncode(req), err)
 		resp.Status = enum.ExceptionTaskStatus

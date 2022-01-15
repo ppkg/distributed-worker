@@ -1,6 +1,6 @@
 package core
 
-type Plugin interface {
+type PluginHandler interface {
 	Name() string
-	Execute(Id, jobId int64, input string) (string, error)
+	Handle(Id, jobId int64, input string) (string, error)
 }

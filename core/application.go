@@ -36,7 +36,9 @@ type ApplicationContext struct {
 	leaderConn *grpc.ClientConn
 	lock       sync.Mutex
 	// 支持的插件集合
-	pluginSet     map[string]Plugin
+	pluginSet map[string]PluginHandler
+	// job回调通知handler集合
+	jobNotifySet  map[string]JobNotifyHandler
 	jobNotifyFunc func(appCtx *ApplicationContext, data dto.JobNotify)
 
 	// nacos服务发现客户端
@@ -47,7 +49,8 @@ type ApplicationContext struct {
 
 func NewApp(opts ...Option) *ApplicationContext {
 	instance := &ApplicationContext{
-		pluginSet: make(map[string]Plugin),
+		pluginSet:    make(map[string]PluginHandler),
+		jobNotifySet: make(map[string]JobNotifyHandler),
 	}
 	instance.initDefaultConfig()
 	for _, m := range opts {
@@ -58,20 +61,34 @@ func NewApp(opts ...Option) *ApplicationContext {
 }
 
 // 注册插件
-func (s *ApplicationContext) RegisterPlugin(plugin Plugin) *ApplicationContext {
+func (s *ApplicationContext) RegisterPlugin(plugin PluginHandler) *ApplicationContext {
 	s.pluginSet[plugin.Name()] = plugin
 	return s
 }
 
-// 获取插件
-func (s *ApplicationContext) GetPlugin(name string) Plugin {
+// 获取插件handler
+func (s *ApplicationContext) GetPluginHandler(name string) PluginHandler {
 	return s.pluginSet[name]
 }
 
+// 获取job回调通知handler
+func (s *ApplicationContext) GetJobNotifyHandler(name string) JobNotifyHandler {
+	return s.jobNotifySet[name]
+}
+
 // 获取所有已注册插件名称
-func (s *ApplicationContext) GetPluginSet() []string {
+func (s *ApplicationContext) GetPluginNameSet() []string {
 	list := make([]string, 0, len(s.pluginSet))
 	for name := range s.pluginSet {
+		list = append(list, name)
+	}
+	return list
+}
+
+// 获取所有已注册job通知处理器名称
+func (s *ApplicationContext) GetJobNotifyNameSet() []string {
+	list := make([]string, 0, len(s.jobNotifySet))
+	for name := range s.jobNotifySet {
 		list = append(list, name)
 	}
 	return list
@@ -157,7 +174,8 @@ func (s *ApplicationContext) initNacos() error {
 		Metadata: map[string]string{
 			"appName":   s.conf.AppName,
 			"nodeId":    s.GetNodeId(),
-			"pluginSet": strings.Join(s.GetPluginSet(), ","),
+			"pluginSet": strings.Join(s.GetPluginNameSet(), ","),
+			"jobNotifySet":strings.Join(s.GetJobNotifyNameSet(),","),
 		},
 		ClusterName: s.conf.Nacos.ClusterName,  // default value is DEFAULT
 		GroupName:   s.conf.Nacos.ServiceGroup, // default value is DEFAULT_GROUP
@@ -183,13 +201,6 @@ func (s *ApplicationContext) Run() error {
 	if err != nil {
 		glog.Errorf("Application/run 初始化nacos客户端异常,%v", err)
 		return err
-	}
-
-	// 订阅job异步通知
-	if s.jobNotifyFunc != nil {
-		go func() {
-			_ = s.doAsyncNotify()
-		}()
 	}
 
 	// 初始化grpc服务

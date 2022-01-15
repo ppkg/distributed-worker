@@ -16,7 +16,7 @@ func (s *multiPlugin) Name() string {
 
 func (s *multiPlugin) Execute(Id int64, jobId int64, input string) (string, error) {
 	var params multiParam
-	kit.JsonDecode([]byte(input), &params)
+	_=kit.JsonDecode([]byte(input), &params)
 	time.Sleep(5 * time.Second)
 	fmt.Printf("%s->完成任务(%d,%d)\n", s.Name(), Id, jobId)
 	return kit.JsonEncode(map[string]interface{}{

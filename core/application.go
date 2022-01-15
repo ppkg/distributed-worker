@@ -95,17 +95,12 @@ func (s *ApplicationContext) initDefaultConfig() {
 	s.conf.SchedulerUrl = os.Getenv("SCHEDULER_URL")
 
 	s.conf.Nacos.WorkerServiceName = "distributed-workder"
-	s.conf.Nacos.WorkerStartupTimeKey = "workerStartupTime"
 	s.conf.Nacos.ClusterName = os.Getenv("NACOS_CLUSTER_NAME")
 	s.conf.Nacos.ServiceGroup = os.Getenv("NACOS_SERVICE_GROUP")
 	if s.conf.Nacos.ServiceGroup == "" {
 		s.conf.Nacos.ServiceGroup = "DEFAULT_GROUP"
 	}
 	s.conf.Nacos.Namespace = os.Getenv("NACOS_NAMESPACE")
-	s.conf.Nacos.ConfigGroup = os.Getenv("NACOS_CONFIG_GROUP")
-	if s.conf.Nacos.ConfigGroup == "" {
-		s.conf.Nacos.ConfigGroup = "DEFAULT_GROUP"
-	}
 }
 
 // 服务发现，向nacos注册服务
@@ -173,19 +168,6 @@ func (s *ApplicationContext) initNacos() error {
 	if !success {
 		return fmt.Errorf("当前节点:%s，注册服务(%s)失败", s.GetNodeId(), s.getEndpoint())
 	}
-
-	// 发布启动时间值变更，驱动调度器更新worker
-	success, err = s.configClient.PublishConfig(vo.ConfigParam{
-		DataId:  s.conf.Nacos.WorkerStartupTimeKey,
-		Group:   s.conf.Nacos.ConfigGroup,
-		Content: time.Now().Format(time.RFC3339),
-	})
-	if err != nil {
-		return fmt.Errorf("当前节点:%s，发布配置异常:%v", s.GetNodeId(), err)
-	}
-	if !success {
-		return fmt.Errorf("当前节点:%s，发布配置失败", s.GetNodeId())
-	}
 	return nil
 }
 
@@ -205,7 +187,9 @@ func (s *ApplicationContext) Run() error {
 
 	// 订阅job异步通知
 	if s.jobNotifyFunc != nil {
-		go s.doAsyncNotify()
+		go func ()  {
+			_=s.doAsyncNotify()
+		}()
 	}
 
 	// 初始化grpc服务
@@ -252,18 +236,7 @@ func (s *ApplicationContext) GetNodeId() string {
 	if prefix == "" {
 		prefix = "worker"
 	}
-	return prefix + strings.ReplaceAll(s.getEndpoint(), ".", "_")
-}
-
-// 重置调度器leader节点连接
-func (s *ApplicationContext) resetLeaderConn() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if s.leaderConn != nil {
-		s.leaderConn.Close()
-		s.leaderConn = nil
-	}
-	s.leaderNode = dto.NodeInfo{}
+	return prefix + strings.ReplaceAll(s.conf.Endpoint, ".", "_")
 }
 
 // 获取调度器leader节点连接
@@ -417,11 +390,6 @@ type NacosConfig struct {
 	Namespace         string
 	ServiceGroup      string
 	ClusterName       string
-
-	// nacos配置服务的配置参数
-	// worker工作节点启动时间key
-	WorkerStartupTimeKey string
-	ConfigGroup          string
 }
 
 type Option func(conf *Config)
@@ -498,10 +466,4 @@ func parseNacosAddr(addr string) (string, int) {
 		}
 	}
 	return pathInfo[0], port
-}
-
-func WithNacosConfigGroupOption(group string) Option {
-	return func(conf *Config) {
-		conf.Nacos.ConfigGroup = group
-	}
 }

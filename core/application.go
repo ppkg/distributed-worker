@@ -16,6 +16,7 @@ import (
 	"github.com/ppkg/distributed-worker/proto/node"
 	"github.com/ppkg/distributed-worker/proto/task"
 	"github.com/ppkg/distributed-worker/util"
+	"github.com/ppkg/kit"
 
 	"github.com/nacos-group/nacos-sdk-go/clients"
 	configClient "github.com/nacos-group/nacos-sdk-go/clients/config_client"
@@ -348,6 +349,69 @@ func (s *ApplicationContext) doServe() error {
 		return fmt.Errorf("failed to grpc serve: %v", err)
 	}
 	return nil
+}
+
+// 同步提交job请求(当调度器挂掉会导致job处理中断，谨用)
+func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.SyncJobResponse, err error) {
+	client := job.NewJobServiceClient(s.GetLeaderConn())
+	stream, err := client.SyncSubmit(context.Background())
+	if err != nil {
+		glog.Errorf("ApplicationContext/SyncSubmitJob 发起同步job请求异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+		return
+	}
+
+	for _, item := range req.TaskInputList {
+		err = stream.Send(&job.SyncSubmitRequest{
+			Name:      req.Name,
+			PluginSet: req.PluginSet,
+			Data:      item,
+		})
+		if err != nil {
+			glog.Errorf("ApplicationContext/SyncSubmitJob 发送同步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+			return
+		}
+	}
+
+	rpcResp, err := stream.CloseAndRecv()
+	if err != nil {
+		glog.Errorf("ApplicationContext/SyncSubmitJob 接收同步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+		return
+	}
+
+	resp.Id = resp.Id
+	resp.Status = rpcResp.Status
+	resp.Result = rpcResp.Result
+	return
+}
+
+// 异步提交job请求
+func (s *ApplicationContext) AsyncSubmitJob(req dto.AsyncJobRequest) (jobId int64, err error) {
+	client := job.NewJobServiceClient(s.GetLeaderConn())
+	stream, err := client.AsyncSubmit(context.Background())
+	if err != nil {
+		glog.Errorf("ApplicationContext/AsyncSubmitJob 发起异步job请求异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+		return
+	}
+
+	for _, item := range req.TaskInputList {
+		err = stream.Send(&job.AsyncSubmitRequest{
+			Name:      req.Name,
+			Type:      req.Type,
+			PluginSet: req.PluginSet,
+			Data:      item,
+		})
+		if err != nil {
+			glog.Errorf("ApplicationContext/AsyncSubmitJob 发送异步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+			return
+		}
+	}
+
+	rpcResp, err := stream.CloseAndRecv()
+	if err != nil {
+		glog.Errorf("ApplicationContext/AsyncSubmitJob 接收异步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+		return
+	}
+	return rpcResp.Id, nil
 }
 
 // 应用配置

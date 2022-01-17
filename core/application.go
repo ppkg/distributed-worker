@@ -214,7 +214,7 @@ func (s *ApplicationContext) Run() error {
 		job.RegisterJobServiceServer(server, NewJobService(s))
 	})
 
-	glog.Infof("worker(%s)已启动...", s.getEndpoint())
+	glog.Infof("worker(%s)已启动,endpoint地址:%s", s.conf.AppName, s.getEndpoint())
 	// 初始化grpc服务
 	err = s.doServe()
 	if err != nil {

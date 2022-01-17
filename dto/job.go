@@ -10,6 +10,8 @@ type JobNotify struct {
 	Status int32
 	// 结果输出
 	Result string
+	// 错误信息
+	Message string
 }
 
 type SyncJobRequest struct {

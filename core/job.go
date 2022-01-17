@@ -36,10 +36,11 @@ func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyReques
 		return nil, errCode.ToGrpcErr(errCode.ErrJobNotifyUnsupport, req.Type)
 	}
 	jobNotify := dto.JobNotify{
-		Id:     req.Id,
-		Name:   req.Name,
-		Status: req.Status,
-		Result: req.Result,
+		Id:      req.Id,
+		Name:    req.Name,
+		Status:  req.Status,
+		Result:  req.Result,
+		Message: req.Mesage,
 	}
 	err := handler.Handle(jobNotify)
 	if err != nil {

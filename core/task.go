@@ -1,10 +1,9 @@
-package service
+package core
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/ppkg/distributed-worker/core"
 	"github.com/ppkg/distributed-worker/enum"
 	"github.com/ppkg/distributed-worker/errCode"
 	"github.com/ppkg/distributed-worker/proto/task"
@@ -14,7 +13,7 @@ import (
 )
 
 type taskService struct {
-	appCtx *core.ApplicationContext
+	appCtx *ApplicationContext
 }
 
 // 同步提交task
@@ -40,7 +39,7 @@ func (s *taskService) SyncSubmit(ctx context.Context, req *task.SubmitRequest) (
 	return resp, nil
 }
 
-func NewTaskService(appCtx *core.ApplicationContext) task.TaskServiceServer {
+func NewTaskService(appCtx *ApplicationContext) task.TaskServiceServer {
 	return &taskService{
 		appCtx: appCtx,
 	}

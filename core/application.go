@@ -14,6 +14,7 @@ import (
 	"github.com/ppkg/distributed-worker/dto"
 	"github.com/ppkg/distributed-worker/proto/job"
 	"github.com/ppkg/distributed-worker/proto/node"
+	"github.com/ppkg/distributed-worker/proto/task"
 	"github.com/ppkg/distributed-worker/util"
 
 	"github.com/nacos-group/nacos-sdk-go/clients"
@@ -213,6 +214,9 @@ func (s *ApplicationContext) Run() error {
 	// 注册内置grpc服务
 	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
 		job.RegisterJobServiceServer(server, NewJobService(s))
+	})
+	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
+		task.RegisterTaskServiceServer(server, NewTaskService(appCtx))
 	})
 
 	glog.Infof("worker(%s)已启动,endpoint地址:%s", s.conf.AppName, s.getEndpoint())

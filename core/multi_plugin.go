@@ -14,9 +14,9 @@ func (s *multiPlugin) Name() string {
 	return "multi"
 }
 
-func (s *multiPlugin) Handle(ctx *ApplicationContext,Id int64, jobId int64, input string) (string, error) {
+func (s *multiPlugin) Handle(Id int64, jobId int64, input string) (string, error) {
 	var params multiParam
-	_=kit.JsonDecode([]byte(input), &params)
+	_ = kit.JsonDecode([]byte(input), &params)
 	time.Sleep(5 * time.Second)
 	fmt.Printf("%s->完成任务(%d,%d)\n", s.Name(), Id, jobId)
 	return kit.JsonEncode(map[string]interface{}{

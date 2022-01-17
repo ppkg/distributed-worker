@@ -59,14 +59,22 @@ func NewApp(opts ...Option) *ApplicationContext {
 }
 
 // 注册插件
-func (s *ApplicationContext) RegisterPlugin(plugin PluginHandler) *ApplicationContext {
-	s.pluginSet[plugin.Name()] = plugin
+func (s *ApplicationContext) RegisterPlugin(fn func(ctx *ApplicationContext) PluginHandler) *ApplicationContext {
+	handler := fn(s)
+	s.pluginSet[handler.Name()] = handler
 	return s
 }
 
 // 获取插件handler
 func (s *ApplicationContext) GetPluginHandler(name string) PluginHandler {
 	return s.pluginSet[name]
+}
+
+// 注册job回调通知
+func (s *ApplicationContext) RegisterJobNotify(fn func(ctx *ApplicationContext) JobNotifyHandler) *ApplicationContext {
+	handler := fn(s)
+	s.jobNotifySet[handler.Name()] = handler
+	return s
 }
 
 // 获取job回调通知handler
@@ -206,6 +214,7 @@ func (s *ApplicationContext) Run() error {
 		job.RegisterJobServiceServer(server, NewJobService(s))
 	})
 
+	glog.Infof("worker(%s)已启动...", s.getEndpoint())
 	// 初始化grpc服务
 	err = s.doServe()
 	if err != nil {

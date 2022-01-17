@@ -15,7 +15,7 @@ type JobNotifyHandler interface {
 	// 返回handler名称，与job中type字段对应
 	Name() string
 	// 通知业务处理
-	Handle(ctx *ApplicationContext, data dto.JobNotify) error
+	Handle(data dto.JobNotify) error
 }
 
 type jobService struct {
@@ -40,7 +40,7 @@ func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyReques
 		Status: req.Status,
 		Result: req.Result,
 	}
-	err := handler.Handle(s.appCtx, jobNotify)
+	err := handler.Handle(jobNotify)
 	if err != nil {
 		glog.Errorf("taskService/AsyncNotify 运行通知处理器(%s)异常,请求参数:%s,err:%+v", req.Type, kit.JsonEncode(req), err)
 		return nil, err

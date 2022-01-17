@@ -398,6 +398,7 @@ func (s *ApplicationContext) AsyncSubmitJob(req dto.AsyncJobRequest) (jobId int6
 		err = stream.Send(&job.AsyncSubmitRequest{
 			Name:      req.Name,
 			Type:      req.Type,
+			IsNotify:  req.IsNotify,
 			PluginSet: req.PluginSet,
 			Data:      item,
 		})

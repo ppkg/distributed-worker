@@ -39,6 +39,8 @@ type AsyncJobRequest struct {
 	Name string
 	// job类型,异步回调通知时使用，根据不同值执行对应业务
 	Type string
+	// job完成是否需要通知
+	IsNotify bool
 	// task处理插件集合
 	PluginSet []string
 	// task入参

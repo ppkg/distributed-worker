@@ -2,9 +2,10 @@ package core
 
 import (
 	"context"
-	"distributed-worker/dto"
-	"distributed-worker/errCode"
-	"distributed-worker/proto/job"
+
+	"github.com/ppkg/distributed-worker/dto"
+	"github.com/ppkg/distributed-worker/errCode"
+	"github.com/ppkg/distributed-worker/proto/job"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/ppkg/glog"

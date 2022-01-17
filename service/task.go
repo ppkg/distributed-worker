@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
-	"distributed-worker/core"
-	"distributed-worker/enum"
-	"distributed-worker/errCode"
-	"distributed-worker/proto/task"
 	"fmt"
+
+	"github.com/ppkg/distributed-worker/core"
+	"github.com/ppkg/distributed-worker/enum"
+	"github.com/ppkg/distributed-worker/errCode"
+	"github.com/ppkg/distributed-worker/proto/task"
 
 	"github.com/ppkg/glog"
 	"github.com/ppkg/kit"

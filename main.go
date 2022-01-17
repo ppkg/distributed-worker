@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	"distributed-worker/core"
-	"distributed-worker/proto/job"
-	"distributed-worker/proto/task"
-	"distributed-worker/service"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"time"
+
+	"github.com/ppkg/distributed-worker/core"
+	"github.com/ppkg/distributed-worker/proto/job"
+	"github.com/ppkg/distributed-worker/proto/task"
+	"github.com/ppkg/distributed-worker/service"
 
 	"github.com/ppkg/kit"
 	"google.golang.org/grpc"

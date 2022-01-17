@@ -2,10 +2,6 @@ package core
 
 import (
 	"context"
-	"distributed-worker/dto"
-	"distributed-worker/proto/job"
-	"distributed-worker/proto/node"
-	"distributed-worker/util"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +10,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ppkg/distributed-worker/dto"
+	"github.com/ppkg/distributed-worker/proto/job"
+	"github.com/ppkg/distributed-worker/proto/node"
+	"github.com/ppkg/distributed-worker/util"
 
 	"github.com/nacos-group/nacos-sdk-go/clients"
 	configClient "github.com/nacos-group/nacos-sdk-go/clients/config_client"

@@ -1,4 +1,4 @@
-module distributed-worker
+module github.com/ppkg/distributed-worker
 
 go 1.16
 

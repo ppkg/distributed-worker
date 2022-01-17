@@ -378,9 +378,10 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 		return
 	}
 
-	resp.Id = resp.Id
+	resp.Id = rpcResp.Id
 	resp.Status = rpcResp.Status
 	resp.Result = rpcResp.Result
+	resp.Message = rpcResp.Mesage
 	return
 }
 

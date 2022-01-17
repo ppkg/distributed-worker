@@ -30,6 +30,8 @@ type SyncJobResponse struct {
 	Status int32
 	// 处理结果
 	Result string
+	// 错误信息
+	Message string
 }
 
 type AsyncJobRequest struct {

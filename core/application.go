@@ -120,7 +120,10 @@ func (s *ApplicationContext) initDefaultConfig() {
 		s.conf.Port = 8080
 	}
 
-	s.conf.SchedulerUrl = os.Getenv("SCHEDULER_URL")
+	s.conf.Nacos.SchedulerServiceName = os.Getenv("NACOS_SCHEDULER_SERVICE_NAME")
+	if s.conf.Nacos.SchedulerServiceName == "" {
+		s.conf.Nacos.SchedulerServiceName = "distributed-scheduler"
+	}
 
 	s.conf.Nacos.WorkerServiceName = "distributed-workder"
 	s.conf.Nacos.ClusterName = os.Getenv("NACOS_CLUSTER_NAME")
@@ -201,9 +204,9 @@ func (s *ApplicationContext) initNacos() error {
 }
 
 func (s *ApplicationContext) Run() error {
-	// 检查调度服务url是否配置
-	if s.conf.SchedulerUrl == "" && len(s.conf.Nacos.Addrs) == 0 {
-		err := errors.New("调度服务地址(SchedulerUrl)或Nacos地址未配置")
+	// 检查nacos服务是否已配置
+	if len(s.conf.Nacos.Addrs) == 0 {
+		err := errors.New("Nacos服务地址未配置")
 		glog.Errorf("Application/run %v", err)
 		return err
 	}
@@ -315,28 +318,18 @@ func (s *ApplicationContext) getServiceList(serviceName string) []nacosModel.Ins
 
 // 获取调度器地址
 func (s *ApplicationContext) getSchedulerUrl() string {
-	scheduleUrl := func() string {
-		if s.namingClient == nil {
-			return s.conf.SchedulerUrl
-		}
-
-		instance, err := s.namingClient.SelectOneHealthyInstance(vo.SelectOneHealthInstanceParam{
-			ServiceName: s.conf.Nacos.SchedulerServiceName,
-			Clusters: []string{
-				s.conf.Nacos.ClusterName,
-			},
-			GroupName: s.conf.Nacos.ServiceGroup,
-		})
-		if err != nil {
-			glog.Errorf("ApplicationContext/getSchedulerUrl 从nacos获取调度器地址异常,err:%+v", err)
-			return s.conf.SchedulerUrl
-		}
+	instance, err := s.namingClient.SelectOneHealthyInstance(vo.SelectOneHealthInstanceParam{
+		ServiceName: s.conf.Nacos.SchedulerServiceName,
+		Clusters: []string{
+			s.conf.Nacos.ClusterName,
+		},
+		GroupName: s.conf.Nacos.ServiceGroup,
+	})
+	if err == nil {
 		return fmt.Sprintf("%s:%d", instance.Ip, instance.Port)
-	}()
-	if scheduleUrl == "" {
-		scheduleUrl = "127.0.0.1:8080"
 	}
-	return scheduleUrl
+	glog.Errorf("ApplicationContext/getSchedulerUrl 从nacos获取调度器地址异常,err:%+v", err)
+	return "127.0.0.1:8080"
 }
 
 func (s *ApplicationContext) getEndpoint() string {
@@ -507,8 +500,6 @@ type Config struct {
 	Endpoint string
 	// 应用监听端口号
 	Port int
-	// 调度器地址(域名/ip+端口号)
-	SchedulerUrl string
 	// nacos配置
 	Nacos NacosConfig
 }
@@ -543,12 +534,6 @@ func WithPortOption(port int) Option {
 func WithEndpointOption(endpoint string) Option {
 	return func(conf *Config) {
 		conf.Endpoint = endpoint
-	}
-}
-
-func WithSchedulerUrlOption(schedulerUrl string) Option {
-	return func(conf *Config) {
-		conf.SchedulerUrl = schedulerUrl
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ppkg/distributed-worker/dto"
+	"github.com/ppkg/distributed-worker/enum"
 	"github.com/ppkg/distributed-worker/proto/job"
 	"github.com/ppkg/distributed-worker/proto/node"
 	"github.com/ppkg/distributed-worker/proto/task"
@@ -22,6 +23,7 @@ import (
 	configClient "github.com/nacos-group/nacos-sdk-go/clients/config_client"
 	namingClient "github.com/nacos-group/nacos-sdk-go/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
+	nacosModel "github.com/nacos-group/nacos-sdk-go/model"
 	"github.com/nacos-group/nacos-sdk-go/vo"
 	"github.com/ppkg/glog"
 	"google.golang.org/grpc"
@@ -211,6 +213,12 @@ func (s *ApplicationContext) Run() error {
 		glog.Errorf("Application/run 初始化nacos客户端异常,%v", err)
 		return err
 	}
+	// 监听调度器服务发现变更
+	err = s.watchSchedulerService()
+	if err != nil {
+		glog.Errorf("Application/run 监控调度器服务异常,%v", err)
+		return err
+	}
 
 	// 注册内置grpc服务
 	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
@@ -227,6 +235,75 @@ func (s *ApplicationContext) Run() error {
 		glog.Errorf("Application/run 监听grpc服务异常,err:%v", err)
 		return err
 	}
+	return nil
+}
+
+// 监听scheduler服务发现
+func (s *ApplicationContext) watchSchedulerService() error {
+	return s.namingClient.Subscribe(&vo.SubscribeParam{
+		ServiceName: s.conf.Nacos.SchedulerServiceName,
+		GroupName:   s.conf.Nacos.ServiceGroup,
+		Clusters: []string{
+			s.conf.Nacos.ClusterName,
+		},
+		SubscribeCallback: func(services []nacosModel.SubscribeService, nacosErr error) {
+			serviceList := s.getServiceList(s.conf.Nacos.SchedulerServiceName)
+			if len(serviceList) == 0 {
+				return
+			}
+			var leaderIntance nacosModel.Instance
+			isFound := false
+			for _, item := range serviceList {
+				if item.Metadata["role"] == enum.LeaderRaftRole {
+					leaderIntance = item
+					isFound = true
+					break
+				}
+			}
+			if !isFound {
+				return
+			}
+
+			// 如果是nodeId相等则说明调度器leader没有变
+			if leaderIntance.Metadata["nodeId"] == s.leaderNode.NodeId {
+				return
+			}
+
+			glog.Infof("Application/watchSchedulerService 当前节点:%s,raft集群leader节点由%s(%)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
+			// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
+			s.resetLeaderConn()
+		},
+	})
+}
+
+// 重置调度器leader连接
+func (s *ApplicationContext) resetLeaderConn() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.leaderNode = dto.NodeInfo{}
+	if s.leaderConn != nil {
+		_ = s.leaderConn.Close()
+	}
+}
+
+// 获取健康的服务列表
+func (s *ApplicationContext) getServiceList(serviceName string) []nacosModel.Instance {
+	instanceList, err := s.namingClient.SelectInstances(vo.SelectInstancesParam{
+		ServiceName: serviceName,
+		HealthyOnly: true,
+		Clusters: []string{
+			s.conf.Nacos.ClusterName,
+		},
+		GroupName: s.conf.Nacos.ServiceGroup,
+	})
+	if err == nil {
+		return instanceList
+	}
+
+	if strings.Contains(err.Error(), "instance list is empty!") {
+		return nil
+	}
+	glog.Errorf("ApplicationContext/getServiceList 从nacos中获取服务列表(%s)异常,err:%+v", serviceName, err)
 	return nil
 }
 
@@ -295,7 +372,7 @@ func (s *ApplicationContext) GetLeaderNode() dto.NodeInfo {
 		if err == nil {
 			break
 		}
-		glog.Errorf("ApplicationContext/GetLeaderNode %v", err.Error())
+		glog.Errorf("ApplicationContext/GetLeaderNode 第%d次重试,%v", retryCount, err.Error())
 		time.Sleep(3 * time.Second)
 		retryCount++
 	}

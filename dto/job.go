@@ -20,7 +20,7 @@ type SyncJobRequest struct {
 	// task处理插件集合
 	PluginSet []string
 	// task入参
-	TaskInputList []string
+	TaskInputList []string `json:"-"`
 }
 
 type SyncJobResponse struct {
@@ -44,5 +44,5 @@ type AsyncJobRequest struct {
 	// task处理插件集合
 	PluginSet []string
 	// task入参
-	TaskInputList []string
+	TaskInputList []string `json:"-"`
 }

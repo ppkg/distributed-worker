@@ -120,6 +120,14 @@ func (s *ApplicationContext) initDefaultConfig() {
 		s.conf.Port = 8080
 	}
 
+	nacosAddrs := os.Getenv("NACOS_ADDRS")
+	if nacosAddrs != "" {
+		addrList := strings.Split(nacosAddrs, ",")
+		for _, item := range addrList {
+			s.appendNacosAddrConfig(item)
+		}
+	}
+
 	s.conf.Nacos.SchedulerServiceName = os.Getenv("NACOS_SCHEDULER_SERVICE_NAME")
 	if s.conf.Nacos.SchedulerServiceName == "" {
 		s.conf.Nacos.SchedulerServiceName = "distributed-scheduler"
@@ -132,6 +140,15 @@ func (s *ApplicationContext) initDefaultConfig() {
 		s.conf.Nacos.ServiceGroup = "DEFAULT_GROUP"
 	}
 	s.conf.Nacos.Namespace = os.Getenv("NACOS_NAMESPACE")
+}
+
+func (s *ApplicationContext) appendNacosAddrConfig(addr string) {
+	if addr == "" {
+		return
+	}
+	host, port := parseNacosAddr(addr)
+	s.conf.Nacos.Addrs = append(s.conf.Nacos.Addrs, host)
+	s.conf.Nacos.Ports = append(s.conf.Nacos.Ports, port)
 }
 
 // 服务发现，向nacos注册服务

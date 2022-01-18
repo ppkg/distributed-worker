@@ -247,6 +247,11 @@ func (s *ApplicationContext) watchSchedulerService() error {
 			s.conf.Nacos.ClusterName,
 		},
 		SubscribeCallback: func(services []nacosModel.SubscribeService, nacosErr error) {
+			// 对于已重置的调度器连接直接return
+			if s.leaderNode.NodeId == "" {
+				return
+			}
+			
 			serviceList := s.getServiceList(s.conf.Nacos.SchedulerServiceName)
 			if len(serviceList) == 0 {
 				return

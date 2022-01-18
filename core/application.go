@@ -251,7 +251,7 @@ func (s *ApplicationContext) watchSchedulerService() error {
 			if s.leaderNode.NodeId == "" {
 				return
 			}
-			
+
 			serviceList := s.getServiceList(s.conf.Nacos.SchedulerServiceName)
 			if len(serviceList) == 0 {
 				return
@@ -288,6 +288,7 @@ func (s *ApplicationContext) resetLeaderConn() {
 	s.leaderNode = dto.NodeInfo{}
 	if s.leaderConn != nil {
 		_ = s.leaderConn.Close()
+		s.leaderConn = nil
 	}
 }
 

@@ -269,7 +269,7 @@ func (s *ApplicationContext) watchSchedulerService() error {
 				return
 			}
 
-			glog.Infof("Application/watchSchedulerService 当前节点:%s,raft集群leader节点由%s(%)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
+			glog.Infof("Application/watchSchedulerService 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
 			// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
 			s.resetLeaderConn()
 		},

@@ -457,7 +457,7 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 		err = stream.Send(&job.SyncSubmitRequest{
 			Name:      req.Name,
 			Label:     req.Label,
-			Source:    req.Source,
+			Source:    s.conf.AppName,
 			PluginSet: req.PluginSet,
 			Data:      item,
 		})

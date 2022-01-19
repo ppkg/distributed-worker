@@ -19,8 +19,6 @@ type SyncJobRequest struct {
 	Name string
 	// job标签，便于job快速搜索
 	Label string
-	// 数据来源，提交job的应用名称
-	Source string
 	// task处理插件集合
 	PluginSet []string
 	// task入参

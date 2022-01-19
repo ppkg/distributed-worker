@@ -17,6 +17,8 @@ type JobNotify struct {
 type SyncJobRequest struct {
 	// job名称
 	Name string
+	// job标签，便于job快速搜索
+	Label string
 	// task处理插件集合
 	PluginSet []string
 	// task入参
@@ -37,6 +39,8 @@ type SyncJobResponse struct {
 type AsyncJobRequest struct {
 	// job名称
 	Name string
+	// job标签，便于job快速搜索
+	Label string
 	// job类型,异步回调通知时使用，根据不同值执行对应业务
 	Type string
 	// job完成是否需要通知

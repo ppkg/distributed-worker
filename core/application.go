@@ -361,7 +361,7 @@ func (s *ApplicationContext) GetNodeId() string {
 	if prefix == "" {
 		prefix = "worker"
 	}
-	return prefix + strings.ReplaceAll(s.getEndpoint(), ".", "_")
+	return prefix + "_" + strings.ReplaceAll(strings.ReplaceAll(s.getEndpoint(), ":", "_"), ".", "_")
 }
 
 // 获取调度器leader节点连接

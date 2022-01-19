@@ -52,7 +52,7 @@ go get github.com/ppkg/distributed-worker
 | WithNacosServiceGroupOption         | NACOS_SERVICE_GROUP          | 否       | nacos分组，为空则为nacos默认分组                             |
 | WithNacosClusterNameOption          | NACOS_CLUSTER_NAME           | 否       | 指定nacos集群，为空则为nacos默认集群                         |
 | WithNacosSchedulerServiceNameOption | NACOS_SCHEDULER_SERVICE_NAME | 否       | 指定调度器服务名，默认值：distributed-scheduler              |
-| WithAppNameOption                   | APP_NAME                     | 否       | 指定应用名称，默认为空                                       |
+| WithAppNameOption                   | APP_NAME                     | 否       | 指定应用名称，默认值：distributed-workder                    |
 | WithPortOption                      | APP_PORT                     | 否       | 指定服务端口号，默认值：8080                                 |
 | WithEndpointOption                  | ENDPOINT                     | 否       | 指定对外服务端点地址，默认当前ip地址                         |
 

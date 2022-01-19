@@ -108,6 +108,9 @@ func (s *ApplicationContext) GetJobNotifyNameSet() []string {
 // 初始化默认配置
 func (s *ApplicationContext) initDefaultConfig() {
 	s.conf.AppName = os.Getenv("APP_NAME")
+	if s.conf.AppName == "" {
+		s.conf.AppName = "distributed-workder"
+	}
 	s.conf.Endpoint = os.Getenv("ENDPOINT")
 	if s.conf.Endpoint == "" {
 		s.conf.Endpoint = util.GetLocalIp()

@@ -41,8 +41,6 @@ type AsyncJobRequest struct {
 	Name string
 	// job标签，便于job快速搜索
 	Label string
-	// 数据来源，提交job的应用名称
-	Source string
 	// job类型,异步回调通知时使用，根据不同值执行对应业务
 	Type string
 	// job完成是否需要通知

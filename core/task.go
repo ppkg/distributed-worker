@@ -26,12 +26,12 @@ func (s *taskService) SyncSubmit(ctx context.Context, req *task.SubmitRequest) (
 	resp := &task.SyncSubmitResponse{
 		Id:     req.Id,
 		JobId:  req.JobId,
-		Status: enum.FinishTaskStatus,
+		Status: int32(enum.FinishTaskStatus),
 	}
 	result, err := handler.Handle(req.Id, req.JobId, req.Data)
 	if err != nil {
 		glog.Errorf("taskService/SyncSubmit 运行插件%s异常,请求参数:%s,err:%+v", req.Plugin, kit.JsonEncode(req), err)
-		resp.Status = enum.ExceptionTaskStatus
+		resp.Status = int32(enum.ExceptionTaskStatus)
 		resp.Message = fmt.Sprintf("运行插件%s异常,err:%+v", req.Plugin, err)
 		return resp, nil
 	}

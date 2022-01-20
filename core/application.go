@@ -282,7 +282,7 @@ func (s *ApplicationContext) watchSchedulerService() error {
 			var leaderIntance nacosModel.Instance
 			isFound := false
 			for _, item := range serviceList {
-				if item.Metadata["role"] == enum.LeaderRaftRole {
+				if enum.RaftRole(item.Metadata["role"]) == enum.LeaderRaftRole {
 					leaderIntance = item
 					isFound = true
 					break

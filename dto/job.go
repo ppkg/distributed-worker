@@ -1,5 +1,7 @@
 package dto
 
+import "github.com/ppkg/distributed-worker/enum"
+
 // job通知信息
 type JobNotify struct {
 	// job ID
@@ -7,7 +9,7 @@ type JobNotify struct {
 	// job名称
 	Name string
 	// job状态,2：执行完成，3：取消执行，4：系统异常，5：task推送失败，6：运行超时，7：业务处理异常
-	Status int32
+	Status enum.JobStatus
 	// 结果输出
 	Result string
 	// 错误信息
@@ -24,14 +26,14 @@ type SyncJobRequest struct {
 	// task入参
 	TaskInputList []string `json:"-"`
 	// task异常操作，0：退出job执行，1：跳过当前task继续执行下一个
-	TaskExceptionOperation int32
+	TaskExceptionOperation enum.TaskExceptionOperation
 }
 
 type SyncJobResponse struct {
 	// job ID
 	Id int64
 	// job状态,0:待执行，1：执行中，2：执行完成，3：取消执行，4：系统异常，5：推送失败，6：运行超时，7：业务处理异常
-	Status int32
+	Status enum.JobStatus
 	// 处理结果
 	Result string
 	// 错误信息
@@ -52,5 +54,5 @@ type AsyncJobRequest struct {
 	// task入参
 	TaskInputList []string `json:"-"`
 	// task异常操作，0：退出job执行，1：跳过当前task继续执行下一个
-	TaskExceptionOperation int32
+	TaskExceptionOperation enum.TaskExceptionOperation
 }

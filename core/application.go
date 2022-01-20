@@ -460,7 +460,7 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 		err = stream.Send(&job.SyncSubmitRequest{
 			Name:                   req.Name,
 			Label:                  req.Label,
-			TaskExceptionOperation: req.TaskExceptionOperation,
+			TaskExceptionOperation: int32(req.TaskExceptionOperation),
 			Source:                 s.conf.AppName,
 			PluginSet:              req.PluginSet,
 			Data:                   item,
@@ -478,7 +478,7 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 	}
 
 	resp.Id = rpcResp.Id
-	resp.Status = rpcResp.Status
+	resp.Status = enum.JobStatus(rpcResp.Status)
 	resp.Result = rpcResp.Result
 	resp.Message = rpcResp.Mesage
 	return
@@ -497,7 +497,7 @@ func (s *ApplicationContext) AsyncSubmitJob(req dto.AsyncJobRequest) (jobId int6
 		err = stream.Send(&job.AsyncSubmitRequest{
 			Name:                   req.Name,
 			Label:                  req.Label,
-			TaskExceptionOperation: req.TaskExceptionOperation,
+			TaskExceptionOperation: int32(req.TaskExceptionOperation),
 			Source:                 s.conf.AppName,
 			Type:                   req.Type,
 			IsNotify:               req.IsNotify,

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ppkg/distributed-worker/dto"
+	"github.com/ppkg/distributed-worker/enum"
 	"github.com/ppkg/distributed-worker/errCode"
 	"github.com/ppkg/distributed-worker/proto/job"
 
@@ -38,7 +39,7 @@ func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyReques
 	jobNotify := dto.JobNotify{
 		Id:      req.Id,
 		Name:    req.Name,
-		Status:  req.Status,
+		Status:  enum.JobStatus(req.Status),
 		Result:  req.Result,
 		Message: req.Mesage,
 	}

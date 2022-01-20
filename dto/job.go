@@ -23,6 +23,8 @@ type SyncJobRequest struct {
 	PluginSet []string
 	// task入参
 	TaskInputList []string `json:"-"`
+	// task异常操作，0：退出job执行，1：跳过当前task继续执行下一个
+	TaskExceptionOperation int32
 }
 
 type SyncJobResponse struct {
@@ -49,4 +51,6 @@ type AsyncJobRequest struct {
 	PluginSet []string
 	// task入参
 	TaskInputList []string `json:"-"`
+	// task异常操作，0：退出job执行，1：跳过当前task继续执行下一个
+	TaskExceptionOperation int32
 }

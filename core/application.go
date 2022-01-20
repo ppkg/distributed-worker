@@ -458,11 +458,12 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 
 	for _, item := range req.TaskInputList {
 		err = stream.Send(&job.SyncSubmitRequest{
-			Name:      req.Name,
-			Label:     req.Label,
-			Source:    s.conf.AppName,
-			PluginSet: req.PluginSet,
-			Data:      item,
+			Name:                   req.Name,
+			Label:                  req.Label,
+			TaskExceptionOperation: req.TaskExceptionOperation,
+			Source:                 s.conf.AppName,
+			PluginSet:              req.PluginSet,
+			Data:                   item,
 		})
 		if err != nil {
 			glog.Errorf("ApplicationContext/SyncSubmitJob 发送同步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
@@ -494,13 +495,14 @@ func (s *ApplicationContext) AsyncSubmitJob(req dto.AsyncJobRequest) (jobId int6
 
 	for _, item := range req.TaskInputList {
 		err = stream.Send(&job.AsyncSubmitRequest{
-			Name:      req.Name,
-			Label:     req.Label,
-			Source:    s.conf.AppName,
-			Type:      req.Type,
-			IsNotify:  req.IsNotify,
-			PluginSet: req.PluginSet,
-			Data:      item,
+			Name:                   req.Name,
+			Label:                  req.Label,
+			TaskExceptionOperation: req.TaskExceptionOperation,
+			Source:                 s.conf.AppName,
+			Type:                   req.Type,
+			IsNotify:               req.IsNotify,
+			PluginSet:              req.PluginSet,
+			Data:                   item,
 		})
 		if err != nil {
 			glog.Errorf("ApplicationContext/AsyncSubmitJob 发送异步job数据异常,参数:%s,err:%+v", kit.JsonEncode(req), err)

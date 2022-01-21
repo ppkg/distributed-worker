@@ -131,18 +131,20 @@ func (s *ApplicationContext) initDefaultConfig() {
 		}
 	}
 
-	s.conf.Nacos.SchedulerServiceName = os.Getenv("NACOS_SCHEDULER_SERVICE_NAME")
-	if s.conf.Nacos.SchedulerServiceName == "" {
-		s.conf.Nacos.SchedulerServiceName = "distributed-scheduler"
+	s.conf.SchedulerServiceName = os.Getenv("SCHEDULER_SERVICE_NAME")
+	if s.conf.SchedulerServiceName == "" {
+		s.conf.SchedulerServiceName = "distributed-scheduler"
 	}
 
-	s.conf.Nacos.WorkerServiceName = "distributed-workder"
 	s.conf.Nacos.ClusterName = os.Getenv("NACOS_CLUSTER_NAME")
 	s.conf.Nacos.ServiceGroup = os.Getenv("NACOS_SERVICE_GROUP")
 	if s.conf.Nacos.ServiceGroup == "" {
 		s.conf.Nacos.ServiceGroup = "DEFAULT_GROUP"
 	}
 	s.conf.Nacos.Namespace = os.Getenv("NACOS_NAMESPACE")
+
+	s.conf.WorkerServiceName = "distributed-workder"
+	s.conf.LeaderStateKey = "leaderState"
 }
 
 func (s *ApplicationContext) appendNacosAddrConfig(addr string) {
@@ -200,7 +202,7 @@ func (s *ApplicationContext) initNacos() error {
 	success, err := s.namingClient.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          s.conf.Endpoint,
 		Port:        uint64(s.conf.Port),
-		ServiceName: s.conf.Nacos.WorkerServiceName,
+		ServiceName: s.conf.WorkerServiceName,
 		Weight:      10,
 		Enable:      true,
 		Healthy:     true,
@@ -242,6 +244,11 @@ func (s *ApplicationContext) Run() error {
 		glog.Errorf("Application/run 监控调度器服务异常,%v", err)
 		return err
 	}
+	err = s.watchRaftLeaderState()
+	if err != nil {
+		glog.Errorf("Application/run 监控调度器状态异常,%v", err)
+		return err
+	}
 
 	// 注册内置grpc服务
 	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
@@ -264,44 +271,60 @@ func (s *ApplicationContext) Run() error {
 // 监听scheduler服务发现
 func (s *ApplicationContext) watchSchedulerService() error {
 	return s.namingClient.Subscribe(&vo.SubscribeParam{
-		ServiceName: s.conf.Nacos.SchedulerServiceName,
+		ServiceName: s.conf.SchedulerServiceName,
 		GroupName:   s.conf.Nacos.ServiceGroup,
 		Clusters: []string{
 			s.conf.Nacos.ClusterName,
 		},
 		SubscribeCallback: func(services []nacosModel.SubscribeService, nacosErr error) {
-			// 对于已重置的调度器连接直接return
-			if s.leaderNode.NodeId == "" {
-				return
-			}
-
-			serviceList := s.getServiceList(s.conf.Nacos.SchedulerServiceName)
-			if len(serviceList) == 0 {
-				return
-			}
-			var leaderIntance nacosModel.Instance
-			isFound := false
-			for _, item := range serviceList {
-				if enum.RaftRole(item.Metadata["role"]) == enum.LeaderRaftRole {
-					leaderIntance = item
-					isFound = true
-					break
-				}
-			}
-			if !isFound {
-				return
-			}
-
-			// 如果是nodeId相等则说明调度器leader没有变
-			if leaderIntance.Metadata["nodeId"] == s.leaderNode.NodeId {
-				return
-			}
-
-			glog.Infof("Application/watchSchedulerService 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
-			// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
-			s.resetLeaderConn()
+			s.dynamicUpdateScheduler()
 		},
 	})
+}
+
+// 监控调度器(raft leader)状态变更
+func (s *ApplicationContext) watchRaftLeaderState() error {
+	return s.configClient.ListenConfig(vo.ConfigParam{
+		DataId: s.conf.LeaderStateKey,
+		Group:  s.conf.Nacos.ServiceGroup,
+		OnChange: func(namespace, group, dataId, data string) {
+			s.dynamicUpdateScheduler()
+		},
+	})
+}
+
+// 动态更新调度器
+func (s *ApplicationContext) dynamicUpdateScheduler() {
+	// 对于已重置的调度器连接直接return
+	if s.leaderNode.NodeId == "" {
+		return
+	}
+
+	serviceList := s.getServiceList(s.conf.SchedulerServiceName)
+	if len(serviceList) == 0 {
+		return
+	}
+	var leaderIntance nacosModel.Instance
+	isFound := false
+	for _, item := range serviceList {
+		if enum.RaftRole(item.Metadata["role"]) == enum.LeaderRaftRole {
+			leaderIntance = item
+			isFound = true
+			break
+		}
+	}
+	if !isFound {
+		return
+	}
+
+	// 如果是nodeId相等则说明调度器leader没有变
+	if leaderIntance.Metadata["nodeId"] == s.leaderNode.NodeId {
+		return
+	}
+
+	glog.Infof("Application/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
+	// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
+	s.resetLeaderConn()
 }
 
 // 重置调度器leader连接
@@ -339,7 +362,7 @@ func (s *ApplicationContext) getServiceList(serviceName string) []nacosModel.Ins
 // 获取调度器地址
 func (s *ApplicationContext) getSchedulerUrl() string {
 	instance, err := s.namingClient.SelectOneHealthyInstance(vo.SelectOneHealthInstanceParam{
-		ServiceName: s.conf.Nacos.SchedulerServiceName,
+		ServiceName: s.conf.SchedulerServiceName,
 		Clusters: []string{
 			s.conf.Nacos.ClusterName,
 		},
@@ -526,20 +549,22 @@ type Config struct {
 	Endpoint string
 	// 应用监听端口号
 	Port int
+	// 调度器服务名称
+	SchedulerServiceName string
+	// worker服务名称
+	WorkerServiceName string
+	// raft leader配置中心key
+	LeaderStateKey string
 	// nacos配置
 	Nacos NacosConfig
 }
 
 type NacosConfig struct {
-	// 调度器服务名称
-	SchedulerServiceName string
-	// worker服务名称
-	WorkerServiceName string
-	Addrs             []string
-	Ports             []int
-	Namespace         string
-	ServiceGroup      string
-	ClusterName       string
+	Addrs        []string
+	Ports        []int
+	Namespace    string
+	ServiceGroup string
+	ClusterName  string
 }
 
 type Option func(conf *Config)
@@ -575,9 +600,9 @@ func WithNacosAddrOption(addr string) Option {
 	}
 }
 
-func WithNacosSchedulerServiceNameOption(serviceName string) Option {
+func WithSchedulerServiceNameOption(serviceName string) Option {
 	return func(conf *Config) {
-		conf.Nacos.SchedulerServiceName = serviceName
+		conf.SchedulerServiceName = serviceName
 	}
 }
 

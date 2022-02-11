@@ -482,6 +482,7 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 	for _, item := range req.TaskInputList {
 		err = stream.Send(&job.SyncSubmitRequest{
 			Name:                   req.Name,
+			Meta:                   req.Meta,
 			Label:                  req.Label,
 			TaskExceptionOperation: int32(req.TaskExceptionOperation),
 			Source:                 s.conf.AppName,
@@ -501,6 +502,7 @@ func (s *ApplicationContext) SyncSubmitJob(req dto.SyncJobRequest) (resp dto.Syn
 	}
 
 	resp.Id = rpcResp.Id
+	resp.Meta = rpcResp.Meta
 	resp.Status = enum.JobStatus(rpcResp.Status)
 	resp.Result = rpcResp.Result
 	resp.Message = rpcResp.Mesage

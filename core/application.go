@@ -522,6 +522,7 @@ func (s *ApplicationContext) AsyncSubmitJob(req dto.AsyncJobRequest) (jobId int6
 		err = stream.Send(&job.AsyncSubmitRequest{
 			Name:                   req.Name,
 			Label:                  req.Label,
+			Meta:                   req.Meta,
 			TaskExceptionOperation: int32(req.TaskExceptionOperation),
 			Source:                 s.conf.AppName,
 			Type:                   req.Type,

@@ -639,3 +639,24 @@ func parseNacosAddr(addr string) (string, int) {
 	}
 	return pathInfo[0], port
 }
+
+// 手动取消job
+func (s *ApplicationContext) ManualCancelJob(req dto.ManualCancelRequest) error {
+	if req.Id == 0 {
+		return fmt.Errorf("参数ID不能为空")
+	}
+	client := job.NewJobServiceClient(s.GetLeaderConn())
+	resp, err := client.ManualCancel(context.Background(), &job.ManualCancelRequest{
+		Id:     req.Id,
+		Reason: req.Reason,
+	})
+	if err != nil {
+		glog.Errorf("ApplicationContext/ManualCancelJob 发起手动取消job请求异常,参数:%s,err:%+v", kit.JsonEncode(req), err)
+		return err
+	}
+	glog.Infof("ApplicationContext/ManualCancelJob 手动取消job返回数据:%s,请求参数:%s", kit.JsonEncode(resp), kit.JsonEncode(req))
+	if resp.Status == int32(enum.FailCancelStatus) {
+		return errors.New(resp.Message)
+	}
+	return nil
+}

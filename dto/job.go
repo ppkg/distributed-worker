@@ -73,3 +73,10 @@ type StartNotify struct {
 	// meta信息
 	Meta map[string]string `json:"meta"`
 }
+
+type ManualCancelRequest struct {
+	// job ID
+	Id int64 `json:"id"`
+	// 取消原因
+	Reason string `json:"reason"`
+}

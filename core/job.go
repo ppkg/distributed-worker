@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ppkg/distributed-worker/dto"
 	"github.com/ppkg/distributed-worker/enum"
@@ -28,7 +29,17 @@ type jobService struct {
 
 // 异步提交job
 func (s *jobService) AsyncSubmit(_ job.JobService_AsyncSubmitServer) error {
-	panic("not implemented")
+	return errors.New("not implemented")
+}
+
+// 同步提交job(当调度器挂掉会导致job处理中断，谨用)
+func (s *jobService) SyncSubmit(_ job.JobService_SyncSubmitServer) error {
+	return errors.New("not implemented")
+}
+
+// 手动取消job
+func (s *jobService) ManualCancel(_ context.Context, _ *job.ManualCancelRequest) (*job.ManualCancelResponse, error) {
+	return nil, errors.New("not implemented")
 }
 
 // 异步结果通知
@@ -73,11 +84,6 @@ func (s *jobService) AsyncPostStart(ctx context.Context, req *job.AsyncPostStart
 		return nil, err
 	}
 	return &empty.Empty{}, nil
-}
-
-// 同步提交job(当调度器挂掉会导致job处理中断，谨用)
-func (s *jobService) SyncSubmit(_ job.JobService_SyncSubmitServer) error {
-	panic("not implemented")
 }
 
 func NewJobService(appCtx *ApplicationContext) job.JobServiceServer {

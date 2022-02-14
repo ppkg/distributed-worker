@@ -8,7 +8,7 @@ import (
 	"github.com/ppkg/distributed-worker/errCode"
 	"github.com/ppkg/distributed-worker/proto/task"
 
-	"github.com/ppkg/glog"
+	"github.com/maybgit/glog"
 	"github.com/ppkg/kit"
 )
 

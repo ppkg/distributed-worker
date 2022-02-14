@@ -10,7 +10,7 @@ import (
 	"github.com/ppkg/distributed-worker/proto/job"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/ppkg/glog"
+	"github.com/maybgit/glog"
 	"github.com/ppkg/kit"
 )
 

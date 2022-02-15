@@ -35,6 +35,7 @@ import (
 type ApplicationContext struct {
 	conf       Config
 	grpcServer *grpc.Server
+	isInit     bool
 	// 调度器leader节点
 	leaderNode dto.NodeInfo
 	leaderConn *grpc.ClientConn
@@ -158,11 +159,6 @@ func (s *ApplicationContext) appendNacosAddrConfig(addr string) {
 
 // 服务发现，向nacos注册服务
 func (s *ApplicationContext) initNacos() error {
-	// 如果nacos未配置则不需要初始化
-	if len(s.conf.Nacos.Addrs) == 0 {
-		return nil
-	}
-
 	var err error
 	clientConfig := constant.ClientConfig{
 		NamespaceId:         s.conf.Nacos.Namespace,
@@ -198,7 +194,11 @@ func (s *ApplicationContext) initNacos() error {
 	if err != nil {
 		return fmt.Errorf("当前应用:%s，实例化nacos服务发现客户端异常:%v", s.conf.AppName, err)
 	}
+	return nil
+}
 
+// 注册服务发现
+func (s *ApplicationContext) initNacosDiscovery() error {
 	success, err := s.namingClient.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          s.conf.Endpoint,
 		Port:        uint64(s.conf.Port),
@@ -225,25 +225,47 @@ func (s *ApplicationContext) initNacos() error {
 	return nil
 }
 
-func (s *ApplicationContext) Run() error {
+// 初始化处理
+func (s *ApplicationContext) Init() error {
+	if s.isInit {
+		return nil
+	}
 	// 检查nacos服务是否已配置
 	if len(s.conf.Nacos.Addrs) == 0 {
 		err := errors.New("Nacos服务地址未配置")
-		glog.Errorf("Application/run %v", err)
+		glog.Errorf("Application/Init %v", err)
 		return err
 	}
 
 	err := s.initNacos()
 	if err != nil {
-		glog.Errorf("Application/run 初始化nacos客户端异常,%v", err)
+		glog.Errorf("Application/Init 初始化nacos客户端异常,%v", err)
 		return err
 	}
+
 	// 监听调度器服务发现变更
 	err = s.watchSchedulerService()
 	if err != nil {
 		glog.Errorf("Application/run 监控调度器服务异常,%v", err)
 		return err
 	}
+
+	s.isInit = true
+	return nil
+}
+
+func (s *ApplicationContext) Run() error {
+	err := s.Init()
+	if err != nil {
+		return err
+	}
+
+	err = s.initNacosDiscovery()
+	if err != nil {
+		glog.Errorf("Application/run 注册服务发现异常,%v", err)
+		return err
+	}
+
 	err = s.watchRaftLeaderState()
 	if err != nil {
 		glog.Errorf("Application/run 监控调度器状态异常,%v", err)
@@ -252,7 +274,7 @@ func (s *ApplicationContext) Run() error {
 
 	// 注册内置grpc服务
 	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
-		job.RegisterJobServiceServer(server, NewJobService(s))
+		job.RegisterJobServiceServer(server, NewJobService(appCtx))
 	})
 	s.RegisterGrpc(func(appCtx *ApplicationContext, server *grpc.Server) {
 		task.RegisterTaskServiceServer(server, NewTaskService(appCtx))

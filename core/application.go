@@ -250,6 +250,13 @@ func (s *ApplicationContext) Init() error {
 		return err
 	}
 
+	// 监听调度器状态
+	err = s.watchRaftLeaderState()
+	if err != nil {
+		glog.Errorf("Application/run 监控调度器状态异常,%v", err)
+		return err
+	}
+
 	s.isInit = true
 	return nil
 }
@@ -263,12 +270,6 @@ func (s *ApplicationContext) Run() error {
 	err = s.initNacosDiscovery()
 	if err != nil {
 		glog.Errorf("Application/run 注册服务发现异常,%v", err)
-		return err
-	}
-
-	err = s.watchRaftLeaderState()
-	if err != nil {
-		glog.Errorf("Application/run 监控调度器状态异常,%v", err)
 		return err
 	}
 

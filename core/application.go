@@ -312,6 +312,7 @@ func (s *ApplicationContext) watchRaftLeaderState() error {
 		DataId: s.conf.LeaderStateKey,
 		Group:  s.conf.Nacos.ServiceGroup,
 		OnChange: func(namespace, group, dataId, data string) {
+			glog.Infof("ApplicationContext/watchSchedulerService 收到leader变更通知:%s,%s,%s,%s", namespace, group, dataId, data)
 			s.dynamicUpdateScheduler()
 		},
 	})
@@ -346,7 +347,7 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 		return
 	}
 
-	glog.Infof("ApplicationContext/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
+	glog.Infof("ApplicationContext/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s变更为%s", s.GetNodeId(), s.leaderNode.NodeId, leaderIntance.Metadata["nodeId"])
 	// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
 	s.resetLeaderConn()
 }

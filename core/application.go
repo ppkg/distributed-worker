@@ -233,27 +233,27 @@ func (s *ApplicationContext) Init() error {
 	// 检查nacos服务是否已配置
 	if len(s.conf.Nacos.Addrs) == 0 {
 		err := errors.New("Nacos服务地址未配置")
-		glog.Errorf("Application/Init %v", err)
+		glog.Errorf("ApplicationContext/Init %v", err)
 		return err
 	}
 
 	err := s.initNacos()
 	if err != nil {
-		glog.Errorf("Application/Init 初始化nacos客户端异常,%v", err)
+		glog.Errorf("ApplicationContext/Init 初始化nacos客户端异常,%v", err)
 		return err
 	}
 
 	// 监听调度器服务发现变更
 	err = s.watchSchedulerService()
 	if err != nil {
-		glog.Errorf("Application/run 监控调度器服务异常,%v", err)
+		glog.Errorf("ApplicationContext/run 监控调度器服务异常,%v", err)
 		return err
 	}
 
 	// 监听调度器状态
 	err = s.watchRaftLeaderState()
 	if err != nil {
-		glog.Errorf("Application/run 监控调度器状态异常,%v", err)
+		glog.Errorf("ApplicationContext/run 监控调度器状态异常,%v", err)
 		return err
 	}
 
@@ -269,7 +269,7 @@ func (s *ApplicationContext) Run() error {
 
 	err = s.initNacosDiscovery()
 	if err != nil {
-		glog.Errorf("Application/run 注册服务发现异常,%v", err)
+		glog.Errorf("ApplicationContext/run 注册服务发现异常,%v", err)
 		return err
 	}
 
@@ -285,7 +285,7 @@ func (s *ApplicationContext) Run() error {
 	// 初始化grpc服务
 	err = s.doServe()
 	if err != nil {
-		glog.Errorf("Application/run 监听grpc服务异常,err:%v", err)
+		glog.Errorf("ApplicationContext/run 监听grpc服务异常,err:%v", err)
 		return err
 	}
 	return nil
@@ -300,6 +300,7 @@ func (s *ApplicationContext) watchSchedulerService() error {
 			s.conf.Nacos.ClusterName,
 		},
 		SubscribeCallback: func(services []nacosModel.SubscribeService, nacosErr error) {
+			glog.Infof("ApplicationContext/watchSchedulerService 收到scheduler服务发现通知:%s,%v", kit.JsonEncode(services), nacosErr)
 			s.dynamicUpdateScheduler()
 		},
 	})
@@ -345,7 +346,7 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 		return
 	}
 
-	glog.Infof("Application/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
+	glog.Infof("ApplicationContext/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s(%s)变更为%s(%s)", s.GetNodeId(), s.leaderNode.NodeId, s.leaderNode.Endpoint, leaderIntance.Metadata["nodeId"], fmt.Sprintf("%s:%d", leaderIntance.Ip, leaderIntance.Port))
 	// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
 	s.resetLeaderConn()
 }

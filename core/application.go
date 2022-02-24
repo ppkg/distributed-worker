@@ -312,7 +312,7 @@ func (s *ApplicationContext) watchRaftLeaderState() error {
 		DataId: s.conf.LeaderStateKey,
 		Group:  s.conf.Nacos.ServiceGroup,
 		OnChange: func(namespace, group, dataId, data string) {
-			glog.Infof("ApplicationContext/watchSchedulerService 收到leader变更通知:%s,%s,%s,%s", namespace, group, dataId, data)
+			glog.Infof("ApplicationContext/watchRaftLeaderState 收到leader变更通知:%s,%s,%s,%s", namespace, group, dataId, data)
 			s.dynamicUpdateScheduler()
 		},
 	})
@@ -329,6 +329,7 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 	if len(serviceList) == 0 {
 		return
 	}
+	glog.Infof("ApplicationContext/dynamicUpdateScheduler scheduler健康实例:%s", kit.JsonEncode(serviceList))
 	var leaderIntance nacosModel.Instance
 	isFound := false
 	for _, item := range serviceList {

@@ -449,9 +449,6 @@ func (s *ApplicationContext) GetLeaderNode() dto.NodeInfo {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestLeaderNode() error {
-	if s.leaderNode.NodeId != "" {
-		return nil
-	}
 	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)

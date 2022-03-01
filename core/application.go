@@ -37,9 +37,9 @@ type ApplicationContext struct {
 	grpcServer *grpc.Server
 	isInit     bool
 	// 调度器leader节点
-	leaderNode dto.NodeInfo
-	leaderConn *grpc.ClientConn
-	lock       sync.Mutex
+	leaderEndpoint string
+	leaderConn     *grpc.ClientConn
+	lock           sync.Mutex
 	// 支持的插件集合
 	pluginSet map[string]PluginHandler
 	// job回调通知handler集合
@@ -242,6 +242,11 @@ func (s *ApplicationContext) Init() error {
 		glog.Errorf("ApplicationContext/Init 初始化nacos客户端异常,%v", err)
 		return err
 	}
+	err = s.initNacosDiscovery()
+	if err != nil {
+		glog.Errorf("ApplicationContext/run 注册服务发现异常,%v", err)
+		return err
+	}
 
 	// 监听调度器服务发现变更
 	err = s.watchSchedulerService()
@@ -264,12 +269,6 @@ func (s *ApplicationContext) Init() error {
 func (s *ApplicationContext) Run() error {
 	err := s.Init()
 	if err != nil {
-		return err
-	}
-
-	err = s.initNacosDiscovery()
-	if err != nil {
-		glog.Errorf("ApplicationContext/run 注册服务发现异常,%v", err)
 		return err
 	}
 
@@ -321,7 +320,7 @@ func (s *ApplicationContext) watchRaftLeaderState() error {
 // 动态更新调度器
 func (s *ApplicationContext) dynamicUpdateScheduler() {
 	// 对于已重置的调度器连接直接return
-	if s.leaderNode.NodeId == "" {
+	if s.leaderEndpoint == "" {
 		return
 	}
 
@@ -343,13 +342,13 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 		return
 	}
 
-	// 如果是nodeId相等则说明调度器leader没有变
-	if leaderIntance.Metadata["nodeId"] == s.leaderNode.NodeId {
+	// 如果是端点相等则说明调度器leader没有变
+	if leaderIntance.Metadata["endpoint"] == s.leaderEndpoint {
 		return
 	}
 
-	glog.Infof("ApplicationContext/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s变更为%s", s.GetNodeId(), s.leaderNode.NodeId, leaderIntance.Metadata["nodeId"])
-	// 如果nodeId不相等则说明调度器leader有变化，需要重置leader连接
+	glog.Infof("ApplicationContext/dynamicUpdateScheduler 当前节点:%s,raft集群leader节点由%s变更为%s", s.GetNodeId(), s.leaderEndpoint, leaderIntance.Metadata["endpoint"])
+	// 如果端点不相等则说明调度器leader有变化，需要重置leader连接
 	s.resetLeaderConn()
 }
 
@@ -357,7 +356,7 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 func (s *ApplicationContext) resetLeaderConn() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.leaderNode = dto.NodeInfo{}
+	s.leaderEndpoint= ""
 	if s.leaderConn != nil {
 		_ = s.leaderConn.Close()
 		s.leaderConn = nil
@@ -416,22 +415,22 @@ func (s *ApplicationContext) GetNodeId() string {
 // 获取调度器leader节点连接
 func (s *ApplicationContext) GetLeaderConn() *grpc.ClientConn {
 	if s.leaderConn == nil {
-		_ = s.GetLeaderNode()
+		_ = s.GetLeaderEndpoint()
 	}
 	return s.leaderConn
 }
 
-// 获取主节点信息
-func (s *ApplicationContext) GetLeaderNode() dto.NodeInfo {
-	if s.leaderNode.NodeId != "" {
-		return s.leaderNode
+// 获取主节点端点
+func (s *ApplicationContext) GetLeaderEndpoint() string {
+	if s.leaderEndpoint != "" {
+		return s.leaderEndpoint
 	}
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if s.leaderNode.NodeId != "" {
-		return s.leaderNode
+	if s.leaderEndpoint != "" {
+		return s.leaderEndpoint
 	}
 
 	retryCount := 1
@@ -440,11 +439,11 @@ func (s *ApplicationContext) GetLeaderNode() dto.NodeInfo {
 		if err == nil {
 			break
 		}
-		glog.Errorf("ApplicationContext/GetLeaderNode 第%d次重试,%v", retryCount, err.Error())
+		glog.Errorf("ApplicationContext/GetLeaderEndpoint 第%d次重试,%v", retryCount, err.Error())
 		time.Sleep(3 * time.Second)
 		retryCount++
 	}
-	return s.leaderNode
+	return s.leaderEndpoint
 }
 
 // 请求获取主节点信息
@@ -461,10 +460,9 @@ func (s *ApplicationContext) requestLeaderNode() error {
 	if err != nil {
 		return fmt.Errorf("获取调度器leader节点信息异常,code:%+v", err)
 	}
-	s.leaderNode.NodeId = resp.NodeInfo.NodeId
-	s.leaderNode.Endpoint = resp.NodeInfo.Endpoint
+	s.leaderEndpoint = resp.NodeInfo.Endpoint
 
-	s.leaderConn, err = grpc.Dial(s.leaderNode.Endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	s.leaderConn, err = grpc.Dial(s.leaderEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器leader节点连接,code:%+v", err)
 	}

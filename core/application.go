@@ -242,11 +242,6 @@ func (s *ApplicationContext) Init() error {
 		glog.Errorf("ApplicationContext/Init 初始化nacos客户端异常,%v", err)
 		return err
 	}
-	err = s.initNacosDiscovery()
-	if err != nil {
-		glog.Errorf("ApplicationContext/run 注册服务发现异常,%v", err)
-		return err
-	}
 
 	// 监听调度器服务发现变更
 	err = s.watchSchedulerService()
@@ -269,6 +264,13 @@ func (s *ApplicationContext) Init() error {
 func (s *ApplicationContext) Run() error {
 	err := s.Init()
 	if err != nil {
+		return err
+	}
+
+	// 注册服务发现
+	err = s.initNacosDiscovery()
+	if err != nil {
+		glog.Errorf("ApplicationContext/run 注册服务发现异常,%v", err)
 		return err
 	}
 
@@ -356,7 +358,7 @@ func (s *ApplicationContext) dynamicUpdateScheduler() {
 func (s *ApplicationContext) resetLeaderConn() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.leaderEndpoint= ""
+	s.leaderEndpoint = ""
 	if s.leaderConn != nil {
 		_ = s.leaderConn.Close()
 		s.leaderConn = nil

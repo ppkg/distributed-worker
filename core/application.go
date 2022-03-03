@@ -472,7 +472,9 @@ func (s *ApplicationContext) requestLeaderNode() error {
 }
 
 func (s *ApplicationContext) initGrpc() {
-	s.grpcServer = grpc.NewServer()
+	maxSize := 4 * 1024 * 1024
+	s.grpcServer = grpc.NewServer(grpc.MaxRecvMsgSize(maxSize),
+		grpc.MaxSendMsgSize(maxSize))
 }
 
 // 注册grpc服务

@@ -450,7 +450,11 @@ func (s *ApplicationContext) GetLeaderEndpoint() string {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestLeaderNode() error {
-	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	maxSize := 30 * 1024 * 1024
+	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(maxSize),
+		grpc.MaxCallSendMsgSize(maxSize),
+	))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)
 	}
@@ -464,7 +468,10 @@ func (s *ApplicationContext) requestLeaderNode() error {
 	}
 	s.leaderEndpoint = resp.NodeInfo.Endpoint
 
-	s.leaderConn, err = grpc.Dial(s.leaderEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(30*1024*1024)))
+	s.leaderConn, err = grpc.Dial(s.leaderEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(maxSize),
+		grpc.MaxCallSendMsgSize(maxSize),
+	))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器leader节点连接,code:%+v", err)
 	}

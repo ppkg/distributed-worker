@@ -3,11 +3,13 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ppkg/distributed-worker/dto"
 	"github.com/ppkg/distributed-worker/enum"
 	"github.com/ppkg/distributed-worker/errCode"
 	"github.com/ppkg/distributed-worker/proto/job"
+	"github.com/ppkg/distributed-worker/util"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/maybgit/glog"
@@ -43,10 +45,16 @@ func (s *jobService) ManualCancel(_ context.Context, _ *job.ManualCancelRequest)
 }
 
 // 异步结果通知
-func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyRequest) (*empty.Empty, error) {
+func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyRequest) (_ *empty.Empty, err error) {
+	defer func() {
+		if panic := recover(); panic != nil {
+			err = fmt.Errorf("执行job回调通知(%s) panic:%+v,trace:%s", req.Type, panic, util.PanicTrace())
+			glog.Errorf("jobService/AsyncNotify %v，请求参数：%s", err, kit.JsonEncode(req))
+		}
+	}()
 	handler := s.appCtx.GetJobNotifyHandler(req.Type)
 	if handler == nil {
-		glog.Errorf("taskService/AsyncNotify 当前服务不支持该通知类型(%s),请求参数:%s", req.Type, kit.JsonEncode(req))
+		glog.Errorf("jobService/AsyncNotify 当前服务不支持该通知类型(%s),请求参数:%s", req.Type, kit.JsonEncode(req))
 		return nil, errCode.ToGrpcErr(errCode.ErrJobNotifyUnsupport, req.Type)
 	}
 	jobNotify := dto.JobNotify{
@@ -57,9 +65,9 @@ func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyReques
 		Result:  req.Result,
 		Message: req.Mesage,
 	}
-	err := handler.Handle(jobNotify)
+	err = handler.Handle(jobNotify)
 	if err != nil {
-		glog.Errorf("taskService/AsyncNotify 运行通知处理器(%s)异常,请求参数:%s,err:%+v", req.Type, kit.JsonEncode(req), err)
+		glog.Errorf("jobService/AsyncNotify 执行job回调通知(%s)异常:%+v,请求参数:%s", req.Type, err, kit.JsonEncode(req))
 		return nil, err
 	}
 	return &empty.Empty{}, nil
@@ -70,7 +78,7 @@ func (s *jobService) AsyncNotify(ctx context.Context, req *job.AsyncNotifyReques
 func (s *jobService) AsyncPostStart(ctx context.Context, req *job.AsyncPostStartRequest) (*empty.Empty, error) {
 	handler := s.appCtx.GetJobNotifyHandler(req.Type)
 	if handler == nil {
-		glog.Errorf("taskService/AsyncPostStart 当前服务不支持该通知类型(%s),请求参数:%s", req.Type, kit.JsonEncode(req))
+		glog.Errorf("jobService/AsyncPostStart 当前服务不支持该通知类型(%s),请求参数:%s", req.Type, kit.JsonEncode(req))
 		return nil, errCode.ToGrpcErr(errCode.ErrJobNotifyUnsupport, req.Type)
 	}
 	startNotify := dto.StartNotify{
@@ -80,7 +88,7 @@ func (s *jobService) AsyncPostStart(ctx context.Context, req *job.AsyncPostStart
 	}
 	err := handler.PostStart(startNotify)
 	if err != nil {
-		glog.Errorf("taskService/AsyncPostStart 运行通知处理器(%s)异常,请求参数:%s,err:%+v", req.Type, kit.JsonEncode(req), err)
+		glog.Errorf("jobService/AsyncPostStart 运行通知处理器(%s)异常,请求参数:%s,err:%+v", req.Type, kit.JsonEncode(req), err)
 		return nil, err
 	}
 	return &empty.Empty{}, nil

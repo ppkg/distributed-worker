@@ -450,11 +450,8 @@ func (s *ApplicationContext) GetLeaderEndpoint() string {
 
 // 请求获取主节点信息
 func (s *ApplicationContext) requestLeaderNode() error {
-	maxSize := 30 * 1024 * 1024
-	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(maxSize),
-		grpc.MaxCallSendMsgSize(maxSize),
-	))
+	maxSize := 50 * 1024 * 1024
+	conn, err := grpc.Dial(s.getSchedulerUrl(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("无法打开调度器连接,code:%+v", err)
 	}
@@ -479,7 +476,7 @@ func (s *ApplicationContext) requestLeaderNode() error {
 }
 
 func (s *ApplicationContext) initGrpc() {
-	maxSize := 4 * 1024 * 1024
+	maxSize := 50 * 1024 * 1024
 	s.grpcServer = grpc.NewServer(grpc.MaxRecvMsgSize(maxSize),
 		grpc.MaxSendMsgSize(maxSize))
 }
